@@ -8,8 +8,8 @@ import (
 func TestNext(t *testing.T) {
 	
 	Played = 0
-	i := next()
-	j := next()
+	i := getNextId()
+	j := getNextId()
 	if (j != i + 1) {
 		t.Errorf("Expected consecutive identifier values and didn't get them.")
 	}

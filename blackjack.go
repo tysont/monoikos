@@ -2,15 +2,12 @@ package main
 
 import (
     "fmt"
-    //"html"
     "log"
     "net/http"
     "math/rand"
-    //"encoding/json"
     "strconv"
 
     "github.com/gorilla/mux"
-    //"github.com/nu7hatch/gouuid"
 )
 
 var Cards = map[int]string{
@@ -49,15 +46,7 @@ var Games map[uint64]*Game
 
 var Played uint64
 
-func main() {
-
-	Played = 0
-	Games = make(map[uint64]*Game, 0)
-
-    serve()
-}
-
-func serve() {
+func StartService() {
 
 	router := mux.NewRouter().StrictSlash(true)
     router.HandleFunc("/blackjack", ShowGames)
@@ -65,13 +54,13 @@ func serve() {
     log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-func next() uint64 {
+func getNextId() uint64 {
 	
 	Played++
 	return Played
 }
 
-func ids() []uint64 {
+func getGameIds() []uint64 {
 
 	u := make([]uint64, len(Games))
 	i := 0
@@ -85,8 +74,8 @@ func ids() []uint64 {
 
 func ShowGames(w http.ResponseWriter, r *http.Request) {
  
- 	fmt.Fprintf(w, "<a href=\"http://localhost:8080/blackjack/%v\">Deal</a><br />", next())
- 	for _, k := range ids() {
+ 	fmt.Fprintf(w, "<a href=\"http://localhost:8080/blackjack/%v\">Deal</a><br />", getNextId())
+ 	for _, k := range getGameIds() {
  		fmt.Fprintf(w, "<a href=\"http://localhost:8080/blackjack/%v\">Play Hand %v</a><br />", k, k)
  	}
 }
