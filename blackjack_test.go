@@ -8,8 +8,8 @@ import (
 func TestNext(t *testing.T) {
 	
 	Played = 0
-	i := getNextId()
-	j := getNextId()
+	i := GetNextId()
+	j := GetNextId()
 	if (j != i + 1) {
 		t.Errorf("Expected consecutive identifier values and didn't get them.")
 	}
@@ -17,30 +17,30 @@ func TestNext(t *testing.T) {
 
 func TestShuffle(t *testing.T) {
 
-	deck := shuffle()
+	deck := Shuffle()
 	l := len(deck)
 	if (l != 52) {
-		t.Errorf("Expected 52 cards in shuffled deck, got '%v'.", l)
+		t.Errorf("Expected 52 cards in Shuffled deck, got '%v'.", l)
 	}
 }
 
 func TestDraw(t *testing.T) {
 
-	deck := shuffle()
-	k, deck := draw(deck)
+	deck := Shuffle()
+	k, deck := Draw(deck)
 	l := len(deck)
 	if (l != 51) {
-		t.Errorf("Expected 51 cards in shuffled deck after 1 draw, got '%v'", l)
+		t.Errorf("Expected 51 cards in Shuffled deck after 1 draw, got '%v'", l)
 	}
 	if (k < 1) || (k > 13) {
-		t.Errorf("Expected to draw a valid card from a shuffled deck, got an invalid one.")
+		t.Errorf("Expected to draw a valid card from a Shuffled deck, got an invalid one.")
 	}
 }
 
 func TestEvaluateEmptyHand(t *testing.T) {
 
 	hand := []int{}
-	v, _ := evaluate(hand)
+	v, _ := Evaluate(hand)
 	if (v != 0) {
 		t.Errorf("Expected 0 when evaluating an empty hand, got '%v'.", v)
 	}
@@ -49,7 +49,7 @@ func TestEvaluateEmptyHand(t *testing.T) {
 func TestEvaluateTenHand(t *testing.T) {
 
 	hand := []int{6, 4}
-	v, _ := evaluate(hand)
+	v, _ := Evaluate(hand)
 	if (v != 10) {
 		t.Errorf("Expected 10 when evaluating a 6/4 hand, got '%v'.", v)
 	}
@@ -58,7 +58,7 @@ func TestEvaluateTenHand(t *testing.T) {
 func TestEvaluateAceHand(t *testing.T) {
 
 	hand := []int{10, 2, 1}
-	v, s := evaluate(hand)
+	v, s := Evaluate(hand)
 	if (v != 13) {
 		t.Errorf("Expected 13 when evaluating a 10/2/A hand, got '%v'.", v)
 	} else if (s == true) {
@@ -69,7 +69,7 @@ func TestEvaluateAceHand(t *testing.T) {
 func TestEvaluateBlackjackHand(t *testing.T) {
 
 	hand := []int{10, 1}
-	v, s := evaluate(hand)
+	v, s := Evaluate(hand)
 	if (v != 21) {
 		t.Errorf("Expected 21 when evaluating a 10/A hand, got '%v'.", v)
 	}  else if (s == false) {
@@ -86,8 +86,8 @@ func TestPayoutWin(t *testing.T) {
 	game.Complete = true
 
 	p := payout(game)
-	if (p != 1) {
-		t.Errorf("Expected a payout of 1 for a 1 bet 21 vs 18, got '%v'.", p)
+	if (p != 10) {
+		t.Errorf("Expected a payout of 10 for a 10 bet 21 vs 18, got '%v'.", p)
 	}
 }
 
@@ -100,8 +100,8 @@ func TestPayoutLoss(t *testing.T) {
 	game.Complete = true
 
 	p := payout(game)
-	if (p != -1) {
-		t.Errorf("Expected a payout of -1 for a 1 bet 17 vs 20, got '%v'.", p)
+	if (p != -10) {
+		t.Errorf("Expected a payout of -10 for a 10 bet 17 vs 20, got '%v'.", p)
 	}
 }
 
@@ -114,8 +114,22 @@ func TestPayoutDouble(t *testing.T) {
 	game.Complete = true
 
 	p := payout(game)
-	if (p != 2) {
-		t.Errorf("Expected a payout of 2 for a 1 bet and double 21 vs 18, got '%v'.", p)
+	if (p != 20) {
+		t.Errorf("Expected a payout of 20 for a 10 bet and double 21 vs 18, got '%v'.", p)
+	}
+}
+
+func TestPayoutBlackjack(t *testing.T) {
+
+	game := new(Game)
+	game.Player = []int{10, 1}
+	game.Dealer = []int{10, 4, 4}
+	game.Double = false
+	game.Complete = true
+
+	p := payout(game)
+	if (p != 15) {
+		t.Errorf("Expected a payout of 15 for a 10 bet and a blackjack, got '%v'.", p)
 	}
 }
 
@@ -128,8 +142,8 @@ func TestPayoutPlayerBust(t *testing.T) {
 	game.Complete = true
 
 	p := payout(game)
-	if (p != -1) {
-		t.Errorf("Expected a payout of -1 for a 1 bet player bust, got '%v'.", p)
+	if (p != -10) {
+		t.Errorf("Expected a payout of -10 for a 10 bet player bust, got '%v'.", p)
 	}
 }
 
@@ -142,8 +156,8 @@ func TestPayoutDealerBust(t *testing.T) {
 	game.Complete = true
 
 	p := payout(game)
-	if (p != 1) {
-		t.Errorf("Expected a payout of 1 for a 1 bet dealer bust, got '%v'.", p)
+	if (p != 10) {
+		t.Errorf("Expected a payout of 10 for a 10 bet dealer bust, got '%v'.", p)
 	}
 }
 
@@ -160,7 +174,7 @@ func TestHit(t *testing.T) {
 
 		g := Games[i]
 		l := len(g.Player)
-		d, _ := evaluate(g.Dealer)
+		d, _ := Evaluate(g.Dealer)
 
 		if (l != 3) {
 			t.Errorf("Expected 3 cards after a hit, got '%v'.", l)
@@ -185,7 +199,7 @@ func TestDouble(t *testing.T) {
 
 		g := Games[i]
 		l := len(g.Player)
-		d, _ := evaluate(g.Dealer)
+		d, _ := Evaluate(g.Dealer)
 		
 		if (l != 3) {
 			t.Errorf("Expected 3 cards after a hit, got '%v'.", l)
@@ -210,7 +224,7 @@ func TestStand(t *testing.T) {
 		Stand(i)
 
 		g := Games[i]
-		d, _ := evaluate(g.Dealer)
+		d, _ := Evaluate(g.Dealer)
 
 		if (!g.Complete) {
 			t.Errorf("Expected game to be complete after stand and it wasn't.")

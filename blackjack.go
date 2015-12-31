@@ -46,6 +46,11 @@ var Games map[uint64]*Game
 
 var Played uint64
 
+func Initiatlize() {
+
+	Games = make(map[uint64]*Game)
+}
+
 func StartService() {
 
 	router := mux.NewRouter().StrictSlash(true)
@@ -54,7 +59,7 @@ func StartService() {
     log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-func getNextId() uint64 {
+func GetNextId() uint64 {
 	
 	Played++
 	return Played
@@ -74,7 +79,7 @@ func getGameIds() []uint64 {
 
 func ShowGames(w http.ResponseWriter, r *http.Request) {
  
- 	fmt.Fprintf(w, "<a href=\"http://localhost:8080/blackjack/%v\">Deal</a><br />", getNextId())
+ 	fmt.Fprintf(w, "<a href=\"http://localhost:8080/blackjack/%v\">Deal</a><br />", GetNextId())
  	for _, k := range getGameIds() {
  		fmt.Fprintf(w, "<a href=\"http://localhost:8080/blackjack/%v\">Play Hand %v</a><br />", k, k)
  	}
@@ -118,7 +123,7 @@ func ShowGame(w http.ResponseWriter, r *http.Request) {
 
 func Deal(id uint64) uint64 {
 
-	deck := shuffle()
+	deck := Shuffle()
 	game := new(Game)
 	game.Double = false
 
@@ -126,16 +131,16 @@ func Deal(id uint64) uint64 {
 	dealer := make([]int, 0)
 	var k int
 
-	k, deck = draw(deck)
+	k, deck = Draw(deck)
 	player = append(player, k)
 
-	k, deck = draw(deck)
+	k, deck = Draw(deck)
 	dealer = append(dealer, k)
 
-	k, deck = draw(deck)
+	k, deck = Draw(deck)
 	player = append(player, k)
 
-	k, deck = draw(deck)
+	k, deck = Draw(deck)
 	dealer = append(dealer, k)
 
 	game.Deck = deck
@@ -151,8 +156,8 @@ func Deal(id uint64) uint64 {
 
 func Hit(id uint64) *Game {
 	
-	game := Games[id]
-	k, deck := draw(game.Deck)
+	game := Peek(id)
+	k, deck := Draw(game.Deck)
 	if (game.Complete) {
 		return game
 	}
@@ -160,7 +165,7 @@ func Hit(id uint64) *Game {
 	game.Player = append(game.Player, k)
 	game.Deck = deck
 	
-	p, _ := evaluate(game.Player)
+	p, _ := Evaluate(game.Player)
 	if (p > 21) {
 		game = Stand(id)
 	}
@@ -170,18 +175,18 @@ func Hit(id uint64) *Game {
 
 func Stand(id uint64) *Game {
 
-	game := Games[id]
+	game := Peek(id)
 	if (game.Complete) {
 		return game
 	}
 
-	d, s := evaluate(game.Dealer)
+	d, s := Evaluate(game.Dealer)
 	for (d < 18) || ((d == 17) && (s == true)) {
 		
-		k, deck := draw(game.Deck)
+		k, deck := Draw(game.Deck)
 		game.Dealer = append(game.Dealer, k)
 		game.Deck = deck
-		d, s = evaluate(game.Dealer)
+		d, s = Evaluate(game.Dealer)
 	}
 
 	game.Complete = true
@@ -191,7 +196,7 @@ func Stand(id uint64) *Game {
 
 func Double(id uint64) *Game {
 
-	game := Games[id]
+	game := Peek(id)
 	if (game.Complete) {
 		return game
 	}
@@ -202,7 +207,12 @@ func Double(id uint64) *Game {
 	return game
 }
 
-func shuffle() []int {
+func Peek(id uint64) *Game {
+
+	return Games[id]
+}
+
+func Shuffle() []int {
 
 	hand := make([]int, 52)
 	for k := 1; k <= 13; k++ {
@@ -214,7 +224,7 @@ func shuffle() []int {
 	return hand
 }
 
-func draw(deck []int) (int, []int) {
+func Draw(deck []int) (int, []int) {
 	
 	k := rand.Intn(len(deck))
 	n := deck[k]
@@ -222,7 +232,7 @@ func draw(deck []int) (int, []int) {
 	return n, deck
 }
 
-func evaluate(hand []int) (int, bool) {
+func Evaluate(hand []int) (int, bool) {
 	
 	e := 0
 	s := false
@@ -267,25 +277,30 @@ func readable(hand []int, hide bool) []string {
 func payout (game *Game) int {
 
 	fmt.Println(game)
-	p, _ := evaluate(game.Player)
-	d, _ := evaluate(game.Dealer)
+	p, _ := Evaluate(game.Player)
+	d, _ := Evaluate(game.Dealer)
+
+	if (p == 21) && (len(game.Player) == 2) {
+		
+		return 15
+	}
 
 	if (p > 21) || ((d <= 21) && (d > p)) {
 		
 		if (game.Double) {
-			return -2
+			return -20
 		}
 
-		return -1
+		return -10
 
 	} else if (d > 21) || (p > d) {
 		
 		if (game.Double) {
-			return 2
+			
+			return 20
 		}
 
-		return 1
-
+		return 10
 	}
 	
 	return 0
