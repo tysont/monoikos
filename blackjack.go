@@ -276,7 +276,7 @@ func readable(hand []int, hide bool) []string {
 
 func payout (game *Game) int {
 
-	fmt.Println(game)
+	//fmt.Println(game)
 	p, _ := Evaluate(game.Player)
 	d, _ := Evaluate(game.Dealer)
 

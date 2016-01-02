@@ -11,8 +11,10 @@ import (
 type Environment interface {
 
 	CreateRandomPolicy() Policy
+	CreatePolicy([]Outcome) Policy
 	CreateExperiment() Experiment
 	GetLegalActions(State) []Action
+	GetKnownStates() []State
 }
 
 type Experiment interface {
@@ -75,7 +77,7 @@ func (this BasicState) GetId() string {
     	i++
     }
 
-    id += "terminal:"
+    id += " terminal:"
     id += strconv.FormatBool(this.Terminal)
     id += "]"
     
@@ -100,8 +102,10 @@ func (this BasicState) GetReward() int {
 
 type Policy interface {
 
-	GetAction(state State) Action
-	AddState(state State)
+	GetAction(State) Action
+	AddRandomState(State)
+	AddState(State, Action, []Action)
+	SetShakeRate(int)
 }
 
 type BasicPolicy struct {
@@ -129,20 +133,21 @@ func (this BasicPolicy) GetAction(state State) Action {
 	id := state.GetId()
 	if _, ok := this.KnownStates[id]; !ok {
 
-		this.AddState(state)
+		this.AddRandomState(state)
 	}
 	
 	k := rand.Intn(100)
-	if k < this.ShakeRate {
+	l := len(this.OtherActions[id])
+	if (l > 0 && k < this.ShakeRate) {
 
-		l := rand.Intn(len(this.OtherActions[id]))
-		return this.OtherActions[id][l]
+		m := rand.Intn(l)
+		return this.OtherActions[id][m]
 	}
 
 	return this.PreferredAction[id]
 }
 
-func (this BasicPolicy) AddState(state State) {
+func (this BasicPolicy) AddRandomState(state State) {
 
 	actions := this.Environment.GetLegalActions(state)
 
@@ -150,10 +155,20 @@ func (this BasicPolicy) AddState(state State) {
 	action := actions[k]
 	actions = append(actions[:k], actions[k + 1:]...)
 
+	this.AddState(state, action, actions)
+}
+
+func (this BasicPolicy) AddState(state State, preferredAction Action, otherActions []Action) {
+
 	id := state.GetId()
 	this.KnownStates[id] = state
-	this.PreferredAction[id] = action
-	this.OtherActions[id] = actions
+	this.PreferredAction[id] = preferredAction
+	this.OtherActions[id] = otherActions
+}
+
+func (this BasicPolicy) SetShakeRate(shakeRate int) {
+
+	this.ShakeRate = shakeRate
 }
 
 type Outcome interface {
