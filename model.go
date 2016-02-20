@@ -2,14 +2,13 @@ package main
 
 import (
 	//"fmt"
+	"math/rand"
 	"sort"
 	"strconv"
-	"math/rand"
 	//"reflect"
 )
 
 type Environment interface {
-
 	CreateRandomPolicy() Policy
 	CreatePolicy([]Outcome) Policy
 	CreateExperiment() Experiment
@@ -18,19 +17,16 @@ type Environment interface {
 }
 
 type Experiment interface {
-
 	ObserveState() State
 	Run(Policy) []Outcome
 }
 
 type Action interface {
-
 	GetId() string
 	Run(map[string]interface{})
 }
 
 type State interface {
-
 	GetId() string
 	IsTerminal() bool
 	GetContext() map[string]string
@@ -38,15 +34,14 @@ type State interface {
 }
 
 type BasicState struct {
-	
-	Context map[string]string
+	Context  map[string]string
 	Terminal bool
-	Reward int
+	Reward   int
 }
 
 func NewBasicState() *BasicState {
 
-	state := BasicState { }
+	state := BasicState{}
 	state.Context = make(map[string]string)
 	return &state
 }
@@ -54,35 +49,34 @@ func NewBasicState() *BasicState {
 func (this BasicState) GetId() string {
 
 	keys := make([]string, len(this.Context))
-    i := 0
-    for k, _ := range this.Context {
-        keys[i] = k
-        i++
-    }
+	i := 0
+	for k, _ := range this.Context {
+		keys[i] = k
+		i++
+	}
 
-    sort.Strings(keys)
+	sort.Strings(keys)
 
-    id := "["
-    i = 0
-    for _, k := range keys {
-    	
-    	if (i > 0) {
-    		id += " "
-    	}
+	id := "["
+	i = 0
+	for _, k := range keys {
 
-    	id += k
-    	id += ":"
-    	id += this.Context[k]
+		if i > 0 {
+			id += " "
+		}
 
-    	i++
-    }
+		id += k
+		id += ":"
+		id += this.Context[k]
 
-    id += " terminal:"
-    id += strconv.FormatBool(this.Terminal)
-    id += "]"
-    
+		i++
+	}
 
-    return id
+	id += " terminal:"
+	id += strconv.FormatBool(this.Terminal)
+	id += "]"
+
+	return id
 }
 
 func (this BasicState) IsTerminal() bool {
@@ -101,7 +95,6 @@ func (this BasicState) GetReward() int {
 }
 
 type Policy interface {
-
 	GetAction(State) Action
 	AddRandomState(State)
 	AddState(State, Action, []Action)
@@ -109,17 +102,16 @@ type Policy interface {
 }
 
 type BasicPolicy struct {
-
-	ShakeRate int
-	Environment Environment
-	KnownStates map[string]State
+	ShakeRate       int
+	Environment     Environment
+	KnownStates     map[string]State
 	PreferredAction map[string]Action
-	OtherActions map[string][]Action
+	OtherActions    map[string][]Action
 }
 
 func NewBasicPolicy() *BasicPolicy {
 
-	policy := BasicPolicy {}
+	policy := BasicPolicy{}
 	policy.ShakeRate = 40
 	policy.KnownStates = make(map[string]State)
 	policy.PreferredAction = make(map[string]Action)
@@ -135,10 +127,10 @@ func (this BasicPolicy) GetAction(state State) Action {
 
 		this.AddRandomState(state)
 	}
-	
+
 	k := rand.Intn(100)
 	l := len(this.OtherActions[id])
-	if (l > 0 && k < this.ShakeRate) {
+	if l > 0 && k < this.ShakeRate {
 
 		m := rand.Intn(l)
 		return this.OtherActions[id][m]
@@ -153,7 +145,7 @@ func (this BasicPolicy) AddRandomState(state State) {
 
 	k := rand.Intn(len(actions))
 	action := actions[k]
-	actions = append(actions[:k], actions[k + 1:]...)
+	actions = append(actions[:k], actions[k+1:]...)
 
 	this.AddState(state, action, actions)
 }
@@ -172,16 +164,14 @@ func (this BasicPolicy) SetShakeRate(shakeRate int) {
 }
 
 type Outcome interface {
-
 	GetId() string
 	GetReward() int
 }
 
 type BasicOutcome struct {
-
 	InitialState State
-	ActionTaken Action
-	FinalState State
+	ActionTaken  Action
+	FinalState   State
 }
 
 func (this BasicOutcome) GetId() string {
