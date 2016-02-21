@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"fmt"
 	"strconv"
@@ -299,3 +300,4 @@ func (this StandAction) GetId() string {
 
 	return "Stand"
 }
+*/

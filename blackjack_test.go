@@ -1,12 +1,13 @@
 package main
 
+/*
 import (
 	//"fmt"
 	"testing"
 )
 
 func TestNext(t *testing.T) {
-	
+
 	Played = 0
 	i := GetNextId()
 	j := GetNextId()
@@ -167,7 +168,7 @@ func TestHit(t *testing.T) {
 	Games = make(map[uint64]*Game, 0)
 
 	for z := 0; z < 100; z++ {
-		
+
 		i := Deal(1)
 		Hit(i)
 		Stand(i)
@@ -200,7 +201,7 @@ func TestDouble(t *testing.T) {
 		g := Games[i]
 		l := len(g.Player)
 		d, _ := Evaluate(g.Dealer)
-		
+
 		if (l != 3) {
 			t.Errorf("Expected 3 cards after a hit, got '%v'.", l)
 		} else if (!g.Complete) {
@@ -234,3 +235,4 @@ func TestStand(t *testing.T) {
 	}
 }
 
+*/

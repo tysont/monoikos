@@ -19,6 +19,7 @@ type Environment interface {
 type Experiment interface {
 	ObserveState() State
 	Run(Policy) []Outcome
+	ForceRun(Action, Policy) []Outcome
 }
 
 type Action interface {
@@ -46,7 +47,7 @@ func NewBasicState() *BasicState {
 	return &state
 }
 
-func (this BasicState) GetId() string {
+func (this *BasicState) GetId() string {
 
 	keys := make([]string, len(this.Context))
 	i := 0
@@ -79,26 +80,28 @@ func (this BasicState) GetId() string {
 	return id
 }
 
-func (this BasicState) IsTerminal() bool {
+func (this *BasicState) IsTerminal() bool {
 
 	return this.Terminal
 }
 
-func (this BasicState) GetContext() map[string]string {
+func (this *BasicState) GetContext() map[string]string {
 
 	return this.Context
 }
 
-func (this BasicState) GetReward() int {
+func (this *BasicState) GetReward() int {
 
 	return this.Reward
 }
 
 type Policy interface {
 	GetAction(State) Action
+	GetPreferredAction(State) Action
 	AddRandomState(State)
 	AddState(State, Action, []Action)
 	SetShakeRate(int)
+	GetShakeRate() int
 }
 
 type BasicPolicy struct {
@@ -120,7 +123,12 @@ func NewBasicPolicy() *BasicPolicy {
 	return &policy
 }
 
-func (this BasicPolicy) GetAction(state State) Action {
+func (this *BasicPolicy) GetPreferredAction(state State) Action {
+
+	return this.PreferredAction[state.GetId()]
+}
+
+func (this *BasicPolicy) GetAction(state State) Action {
 
 	id := state.GetId()
 	if _, ok := this.KnownStates[id]; !ok {
@@ -139,7 +147,7 @@ func (this BasicPolicy) GetAction(state State) Action {
 	return this.PreferredAction[id]
 }
 
-func (this BasicPolicy) AddRandomState(state State) {
+func (this *BasicPolicy) AddRandomState(state State) {
 
 	actions := this.Environment.GetLegalActions(state)
 
@@ -150,7 +158,7 @@ func (this BasicPolicy) AddRandomState(state State) {
 	this.AddState(state, action, actions)
 }
 
-func (this BasicPolicy) AddState(state State, preferredAction Action, otherActions []Action) {
+func (this *BasicPolicy) AddState(state State, preferredAction Action, otherActions []Action) {
 
 	id := state.GetId()
 	this.KnownStates[id] = state
@@ -158,14 +166,21 @@ func (this BasicPolicy) AddState(state State, preferredAction Action, otherActio
 	this.OtherActions[id] = otherActions
 }
 
-func (this BasicPolicy) SetShakeRate(shakeRate int) {
+func (this *BasicPolicy) SetShakeRate(shakeRate int) {
 
 	this.ShakeRate = shakeRate
+}
+
+func (this *BasicPolicy) GetShakeRate() int {
+
+	return this.ShakeRate
 }
 
 type Outcome interface {
 	GetId() string
 	GetReward() int
+	GetInitialState() State
+	GetFinalState() State
 }
 
 type BasicOutcome struct {
@@ -174,7 +189,7 @@ type BasicOutcome struct {
 	FinalState   State
 }
 
-func (this BasicOutcome) GetId() string {
+func (this *BasicOutcome) GetId() string {
 
 	s := "["
 	s += this.InitialState.GetId()
@@ -185,7 +200,17 @@ func (this BasicOutcome) GetId() string {
 	return s
 }
 
-func (this BasicOutcome) GetReward() int {
+func (this *BasicOutcome) GetReward() int {
 
 	return this.FinalState.GetReward()
+}
+
+func (this *BasicOutcome) GetInitialState() State {
+
+	return this.InitialState
+}
+
+func (this *BasicOutcome) GetFinalState() State {
+
+	return this.FinalState
 }

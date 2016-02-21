@@ -1,12 +1,13 @@
 package main
 
+/*
 import (
 	//"fmt"
 	"testing"
 )
 
 func TestGetThreeLegalActions(t *testing.T) {
-	
+
 	state := NewBasicState()
 	state.Context[playerContextKey] = "10"
 	state.Context[pairContextKey] = "true"
@@ -23,7 +24,7 @@ func TestGetThreeLegalActions(t *testing.T) {
 }
 
 func TestGetTwoLegalActions(t *testing.T) {
-	
+
 	state := NewBasicState()
 	state.Context[playerContextKey] = "14"
 	state.Context[pairContextKey] = "false"
@@ -38,3 +39,4 @@ func TestGetTwoLegalActions(t *testing.T) {
 		t.Errorf("Expected 2 legal actions for a non-pair of cards, got '%v'.", l)
 	}
 }
+*/
