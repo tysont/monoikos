@@ -1,6 +1,5 @@
 package main
 
-/*
 import (
 	"fmt"
 	"strconv"
@@ -21,13 +20,13 @@ func main() {
 	policy := environment.CreateRandomPolicy()
 	oldPolicy := policy
 
-	for i := 40; i >= 31; i -= 5 {
+	for i := 40; i >= 0; i -= 2 {
 
 		n := 0
 		t := 0
 		policy.SetShakeRate(i)
-		outcomes := []Outcome{}
-		for j := 0; j < 100000; j++ {
+		outcomes := make([]Outcome, 0)
+		for j := 0; j < 200000; j++ {
 
 			r := 0
 			experiment := environment.CreateExperiment()
@@ -48,21 +47,23 @@ func main() {
 	}
 
 	for _, state := range environment.GetKnownStates() {
-		fmt.Printf("'%v'='%v'->'%v'\n", state.GetId(), oldPolicy.GetAction(state).GetId(), policy.GetAction(state).GetId())
+		if state.GetContext()[playerContextKey] != "21" || state.GetContext()[pairContextKey] != "true" {
+			fmt.Printf("'%v'='%v'->'%v'\n", state.GetId(), oldPolicy.GetPreferredAction(state).GetId(), policy.GetPreferredAction(state).GetId())
+		}
 	}
 }
 
 type BlackjackEnvironment struct{}
 
-func (this BlackjackEnvironment) CreateRandomPolicy() Policy {
+func (this *BlackjackEnvironment) CreateRandomPolicy() Policy {
 
 	policy := NewBasicPolicy()
 	policy.Environment = this
 
-	return *policy
+	return policy
 }
 
-func (this BlackjackEnvironment) CreatePolicy(outcomes []Outcome) Policy {
+func (this *BlackjackEnvironment) CreatePolicy(outcomes []Outcome) Policy {
 
 	policy := NewBasicPolicy()
 	policy.Environment = this
@@ -128,10 +129,10 @@ func (this BlackjackEnvironment) CreatePolicy(outcomes []Outcome) Policy {
 		}
 	}
 
-	return *policy
+	return policy
 }
 
-func (this BlackjackEnvironment) CreateExperiment() Experiment {
+func (this *BlackjackEnvironment) CreateExperiment() Experiment {
 
 	experiment := NewBlackjackExperiment()
 
@@ -145,7 +146,7 @@ func (this BlackjackEnvironment) CreateExperiment() Experiment {
 	return experiment
 }
 
-func (this BlackjackEnvironment) GetLegalActions(state State) []Action {
+func (this *BlackjackEnvironment) GetLegalActions(state State) []Action {
 
 	s, ok := state.GetContext()[pairContextKey]
 	if !ok {
@@ -176,9 +177,9 @@ func (this BlackjackEnvironment) GetLegalActions(state State) []Action {
 	return actions
 }
 
-func (this BlackjackEnvironment) GetKnownStates() []State {
+func (this *BlackjackEnvironment) GetKnownStates() []State {
 
-	states := []State{}
+	states := make([]State, 0)
 	for player := 2; player <= 21; player++ {
 		for dealer := 2; dealer <= 21; dealer++ {
 
@@ -210,13 +211,13 @@ type BlackjackExperiment struct {
 
 func NewBlackjackExperiment() *BlackjackExperiment {
 
-	experiment := BlackjackExperiment{}
+	experiment := new(BlackjackExperiment)
 	experiment.Context = make(map[string]interface{})
 
-	return &experiment
+	return experiment
 }
 
-func (this BlackjackExperiment) ObserveState() State {
+func (this *BlackjackExperiment) ObserveState() State {
 
 	game := Peek(this.Context[idContextKey].(uint64))
 
@@ -238,16 +239,51 @@ func (this BlackjackExperiment) ObserveState() State {
 	return state
 }
 
-func (this BlackjackExperiment) Run(policy Policy) []Outcome {
+func (this *BlackjackExperiment) Run(policy Policy) []Outcome {
 
-	basicOutcomes := make([]BasicOutcome, 0)
+	basicOutcomes := make([]*BasicOutcome, 0)
 	state := this.ObserveState()
 	for !state.IsTerminal() {
 
 		action := policy.GetAction(state)
 		action.Run(this.Context)
 
-		outcome := BasicOutcome{}
+		outcome := new(BasicOutcome)
+		outcome.InitialState = state
+		outcome.ActionTaken = action
+		basicOutcomes = append(basicOutcomes, outcome)
+
+		state = this.ObserveState()
+	}
+
+	outcomes := make([]Outcome, 0)
+	for _, outcome := range basicOutcomes {
+
+		outcome.FinalState = state
+		outcomes = append(outcomes, outcome)
+	}
+
+	return outcomes
+}
+
+func (this *BlackjackExperiment) ForceRun(action Action, policy Policy) []Outcome {
+
+	basicOutcomes := make([]*BasicOutcome, 0)
+	state := this.ObserveState()
+
+	action.Run(this.Context)
+	outcome := new(BasicOutcome)
+	outcome.InitialState = state
+	outcome.ActionTaken = action
+	basicOutcomes = append(basicOutcomes, outcome)
+
+	state = this.ObserveState()
+	for !state.IsTerminal() {
+
+		action := policy.GetAction(state)
+		action.Run(this.Context)
+
+		outcome := new(BasicOutcome)
 		outcome.InitialState = state
 		outcome.ActionTaken = action
 		basicOutcomes = append(basicOutcomes, outcome)
@@ -267,37 +303,36 @@ func (this BlackjackExperiment) Run(policy Policy) []Outcome {
 
 type HitAction struct{}
 
-func (this HitAction) Run(context map[string]interface{}) {
+func (this *HitAction) Run(context map[string]interface{}) {
 
 	Hit(context[idContextKey].(uint64))
 }
 
-func (this HitAction) GetId() string {
+func (this *HitAction) GetId() string {
 
 	return "Hit"
 }
 
 type DoubleAction struct{}
 
-func (this DoubleAction) Run(context map[string]interface{}) {
+func (this *DoubleAction) Run(context map[string]interface{}) {
 
 	Double(context[idContextKey].(uint64))
 }
 
-func (this DoubleAction) GetId() string {
+func (this *DoubleAction) GetId() string {
 
 	return "Double"
 }
 
 type StandAction struct{}
 
-func (this StandAction) Run(context map[string]interface{}) {
+func (this *StandAction) Run(context map[string]interface{}) {
 
 	Stand(context[idContextKey].(uint64))
 }
 
-func (this StandAction) GetId() string {
+func (this *StandAction) GetId() string {
 
 	return "Stand"
 }
-*/

@@ -1,23 +1,23 @@
 package main
 
 import (
-	"fmt"
+	//"fmt"
 	"math/rand"
 	"strconv"
-	//"reflect"
 )
 
 var countContextKey = "count"
 var doneContextKey = "done"
-var max = 10
+var max = 20
 
+/*
 func main() {
 
 	environment := new(CountEnvironment)
 	policy := environment.CreateRandomPolicy()
 	policy.SetShakeRate(0)
 
-	for i := 40; i >= 1; i -= 10 {
+	for i := 40; i >= 0; i -= 10 {
 
 		n := 0
 		t := 0
@@ -37,7 +37,7 @@ func main() {
 			t += r
 		}
 
-		for i := 0; i < 10; i++ {
+		for i := 0; i < max; i++ {
 
 			state := NewBasicState()
 			state.GetContext()[countContextKey] = strconv.Itoa(i)
@@ -51,6 +51,7 @@ func main() {
 	}
 
 }
+*/
 
 type CountEnvironment struct{}
 
