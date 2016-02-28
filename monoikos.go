@@ -1,16 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
-	//"reflect"
 )
 
 func main() {
-
-	PlayBlackjack()
 
 }
 
@@ -305,7 +301,6 @@ func CreateOptimizedPolicy(environment Environment, initialShakeRate int, experi
 		t := 0
 
 		shakeRate := int(float64(initialShakeRate) * (float64(i) / float64(iterations-1)))
-		fmt.Println(shakeRate)
 		policy.SetShakeRate(shakeRate)
 
 		outcomes := []Outcome{}
