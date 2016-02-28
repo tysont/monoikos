@@ -2,12 +2,11 @@ package main
 
 import (
 	//"fmt"
-	//"math/rand"
+	"math/rand"
 	"strconv"
 	"testing"
 )
 
-/*
 func TestZeroShakePolicyDeterminism(t *testing.T) {
 
 	environment := new(CountEnvironment)
@@ -91,8 +90,6 @@ func TestActionResults(t *testing.T) {
 	}
 }
 
-*/
-
 func TestCreatePolicyFromOutcomes(t *testing.T) {
 
 	environment := new(CountEnvironment)
@@ -136,7 +133,7 @@ func TestCreatePolicyFromOutcomes(t *testing.T) {
 	correct := true
 	for j := 0; j < 100; j++ {
 
-		policy = environment.CreatePolicy(outcomes)
+		policy = environment.CreateImprovedPolicy(outcomes)
 		if policy.GetPreferredAction(s1).GetId() != ia.GetId() {
 
 			correct = false
@@ -148,5 +145,4 @@ func TestCreatePolicyFromOutcomes(t *testing.T) {
 
 		t.Errorf("Expected policy to pick correct preferred action based on outcomes, and it didn't.")
 	}
-
 }

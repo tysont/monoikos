@@ -1,6 +1,5 @@
 package main
 
-/*
 import (
 	//"fmt"
 	"testing"
@@ -14,11 +13,11 @@ func TestGetThreeLegalActions(t *testing.T) {
 	state.Context[softContextKey] = "false"
 	state.Context[dealerContextKey] = "15"
 
-	environment := BlackjackEnvironment { }
+	environment := BlackjackEnvironment{}
 	actions := environment.GetLegalActions(state)
 	l := len(actions)
 
-	if (l != 3) {
+	if l != 3 {
 		t.Errorf("Expected 3 legal actions for a pair of cards, got '%v'.", l)
 	}
 }
@@ -31,12 +30,11 @@ func TestGetTwoLegalActions(t *testing.T) {
 	state.Context[softContextKey] = "false"
 	state.Context[dealerContextKey] = "15"
 
-	environment := BlackjackEnvironment { }
+	environment := BlackjackEnvironment{}
 	actions := environment.GetLegalActions(state)
 	l := len(actions)
 
-	if (l != 2) {
+	if l != 2 {
 		t.Errorf("Expected 2 legal actions for a non-pair of cards, got '%v'.", l)
 	}
 }
-*/
