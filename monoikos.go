@@ -1,4 +1,4 @@
-package main
+package monoikos
 
 import (
 	"math/rand"

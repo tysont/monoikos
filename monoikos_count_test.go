@@ -1,9 +1,11 @@
-package main
+package monoikos_test
 
 import (
 	"math/rand"
 	"strconv"
 	"testing"
+
+	"bitbucket.org/tysont/monoikos"
 )
 
 var countContextKey = "count"
@@ -101,35 +103,35 @@ func TestCreatePolicyFromOutcomes(t *testing.T) {
 	ia := new(IncrementAction)
 	sa := new(StopAction)
 
-	s1 := NewBasicState()
+	s1 := monoikos.NewBasicState()
 	s1.GetContext()[countContextKey] = strconv.Itoa(1)
 	s1.GetContext()[doneContextKey] = strconv.FormatBool(false)
 	s1.Terminal = false
 	SetReward(s1)
 
-	s2 := NewBasicState()
+	s2 := monoikos.NewBasicState()
 	s2.GetContext()[countContextKey] = strconv.Itoa(2)
 	s2.GetContext()[doneContextKey] = strconv.FormatBool(true)
 	s2.Terminal = true
 	SetReward(s2)
 
-	s3 := NewBasicState()
+	s3 := monoikos.NewBasicState()
 	s3.GetContext()[countContextKey] = strconv.Itoa(1)
 	s3.GetContext()[doneContextKey] = strconv.FormatBool(true)
 	s3.Terminal = true
 	SetReward(s3)
 
-	o1 := new(BasicOutcome)
+	o1 := new(monoikos.BasicOutcome)
 	o1.InitialState = s1
 	o1.ActionTaken = ia
 	o1.FinalState = s2
 
-	o2 := new(BasicOutcome)
+	o2 := new(monoikos.BasicOutcome)
 	o2.InitialState = s1
 	o2.ActionTaken = sa
 	o2.FinalState = s3
 
-	outcomes := make([]Outcome, 2)
+	outcomes := make([]monoikos.Outcome, 2)
 	outcomes[0] = o1
 	outcomes[1] = o2
 
@@ -153,14 +155,14 @@ func TestCreatePolicyFromOutcomes(t *testing.T) {
 func TestCreateOptimizedCountPolicy(t *testing.T) {
 
 	environment := new(CountEnvironment)
-	policy := environment.CreateOptimizedPolicy(40, 100000, 8)
+	policy := environment.CreateOptimizedPolicy(40, 100000, 5)
 
-	var state State
-	var action Action
+	var state monoikos.State
+	var action monoikos.Action
 
 	for i := 1; i < max-1; i++ {
 
-		state = NewBasicState()
+		state = monoikos.NewBasicState()
 		state.GetContext()[countContextKey] = strconv.Itoa(i)
 		state.GetContext()[doneContextKey] = strconv.FormatBool(false)
 
@@ -172,7 +174,7 @@ func TestCreateOptimizedCountPolicy(t *testing.T) {
 
 	/*
 		// 19 and 20 fail right now, need to debug.
-		state = NewBasicState()
+		state = monoikos.NewBasicState()
 		state.GetContext()[countContextKey] = strconv.Itoa(max)
 		state.GetContext()[doneContextKey] = strconv.FormatBool(false)
 
@@ -185,49 +187,49 @@ func TestCreateOptimizedCountPolicy(t *testing.T) {
 
 type CountEnvironment struct{}
 
-func (this *CountEnvironment) CreateRandomPolicy() Policy {
+func (this *CountEnvironment) CreateRandomPolicy() monoikos.Policy {
 
-	return CreateRandomPolicy(this)
+	return monoikos.CreateRandomPolicy(this)
 }
 
-func (this *CountEnvironment) CreateImprovedPolicy(outcomes []Outcome) Policy {
+func (this *CountEnvironment) CreateImprovedPolicy(outcomes []monoikos.Outcome) monoikos.Policy {
 
-	return CreateImprovedPolicy(this, outcomes)
+	return monoikos.CreateImprovedPolicy(this, outcomes)
 }
 
-func (this *CountEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) Policy {
+func (this *CountEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
 
-	return CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
+	return monoikos.CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
 }
 
-func (this *CountEnvironment) CreateExperiment() Experiment {
+func (this *CountEnvironment) CreateExperiment() monoikos.Experiment {
 
 	experiment := NewCountExperiment()
 	return experiment
 }
 
-func (this *CountEnvironment) GetLegalActions(state State) []Action {
+func (this *CountEnvironment) GetLegalActions(state monoikos.State) []monoikos.Action {
 
-	actions := make([]Action, 2)
+	actions := make([]monoikos.Action, 2)
 	actions[0] = new(IncrementAction)
 	actions[1] = new(StopAction)
 	return actions
 }
 
-func (this *CountEnvironment) GetKnownStates() []State {
+func (this *CountEnvironment) GetKnownStates() []monoikos.State {
 
-	states := make([]State, 0)
+	states := make([]monoikos.State, 0)
 
 	for i := 0; i <= max; i++ {
 
-		s1 := NewBasicState()
+		s1 := monoikos.NewBasicState()
 		s1.GetContext()[countContextKey] = strconv.Itoa(i)
 		s1.GetContext()[doneContextKey] = strconv.FormatBool(false)
 		s1.Terminal = false
 		SetReward(s1)
 		states = append(states, s1)
 
-		s2 := NewBasicState()
+		s2 := monoikos.NewBasicState()
 		s2.GetContext()[countContextKey] = strconv.Itoa(i)
 		s2.GetContext()[doneContextKey] = strconv.FormatBool(true)
 		s2.Terminal = true
@@ -251,9 +253,9 @@ func NewCountExperiment() *CountExperiment {
 	return experiment
 }
 
-func (this *CountExperiment) ObserveState() State {
+func (this *CountExperiment) ObserveState() monoikos.State {
 
-	state := NewBasicState()
+	state := monoikos.NewBasicState()
 
 	count := this.Context[countContextKey].(int)
 	done := this.Context[doneContextKey].(bool)
@@ -266,7 +268,7 @@ func (this *CountExperiment) ObserveState() State {
 	return state
 }
 
-func SetReward(state *BasicState) {
+func SetReward(state *monoikos.BasicState) {
 
 	count, _ := strconv.Atoi(state.Context[countContextKey])
 	done, _ := strconv.ParseBool(state.Context[doneContextKey])
@@ -288,16 +290,16 @@ func SetReward(state *BasicState) {
 	}
 }
 
-func (this *CountExperiment) Run(policy Policy) []Outcome {
+func (this *CountExperiment) Run(policy monoikos.Policy) []monoikos.Outcome {
 
-	basicOutcomes := make([]*BasicOutcome, 0)
+	basicOutcomes := make([]*monoikos.BasicOutcome, 0)
 	state := this.ObserveState()
 	for !state.IsTerminal() {
 
 		action := policy.GetAction(state)
 		action.Run(this.Context)
 
-		outcome := new(BasicOutcome)
+		outcome := new(monoikos.BasicOutcome)
 		outcome.InitialState = state
 		outcome.ActionTaken = action
 		basicOutcomes = append(basicOutcomes, outcome)
@@ -305,7 +307,7 @@ func (this *CountExperiment) Run(policy Policy) []Outcome {
 		state = this.ObserveState()
 	}
 
-	outcomes := make([]Outcome, 0)
+	outcomes := make([]monoikos.Outcome, 0)
 	for _, outcome := range basicOutcomes {
 
 		outcome.FinalState = state
@@ -315,13 +317,13 @@ func (this *CountExperiment) Run(policy Policy) []Outcome {
 	return outcomes
 }
 
-func (this *CountExperiment) ForceRun(action Action, policy Policy) []Outcome {
+func (this *CountExperiment) ForceRun(action monoikos.Action, policy monoikos.Policy) []monoikos.Outcome {
 
-	basicOutcomes := make([]*BasicOutcome, 0)
+	basicOutcomes := make([]*monoikos.BasicOutcome, 0)
 	state := this.ObserveState()
 
 	action.Run(this.Context)
-	outcome := new(BasicOutcome)
+	outcome := new(monoikos.BasicOutcome)
 	outcome.InitialState = state
 	outcome.ActionTaken = action
 	basicOutcomes = append(basicOutcomes, outcome)
@@ -332,7 +334,7 @@ func (this *CountExperiment) ForceRun(action Action, policy Policy) []Outcome {
 		action := policy.GetAction(state)
 		action.Run(this.Context)
 
-		outcome := new(BasicOutcome)
+		outcome := new(monoikos.BasicOutcome)
 		outcome.InitialState = state
 		outcome.ActionTaken = action
 		basicOutcomes = append(basicOutcomes, outcome)
@@ -340,7 +342,7 @@ func (this *CountExperiment) ForceRun(action Action, policy Policy) []Outcome {
 		state = this.ObserveState()
 	}
 
-	outcomes := make([]Outcome, 0)
+	outcomes := make([]monoikos.Outcome, 0)
 	for _, outcome := range basicOutcomes {
 
 		outcome.FinalState = state

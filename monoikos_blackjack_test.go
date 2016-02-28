@@ -1,9 +1,10 @@
-package main
+package monoikos_test
 
 import (
 	"strconv"
 	"testing"
 
+	"bitbucket.org/tysont/monoikos"
 	"github.com/tysont/blackjack"
 )
 
@@ -15,7 +16,7 @@ var dealerContextKey = "dealer"
 
 func TestGetThreeLegalActions(t *testing.T) {
 
-	state := NewBasicState()
+	state := monoikos.NewBasicState()
 	state.Context[playerContextKey] = "10"
 	state.Context[pairContextKey] = "true"
 	state.Context[softContextKey] = "false"
@@ -32,7 +33,7 @@ func TestGetThreeLegalActions(t *testing.T) {
 
 func TestGetTwoLegalActions(t *testing.T) {
 
-	state := NewBasicState()
+	state := monoikos.NewBasicState()
 	state.Context[playerContextKey] = "14"
 	state.Context[dealerContextKey] = "15"
 	state.Context[pairContextKey] = "false"
@@ -52,10 +53,10 @@ func TestOptimizeBlackjackPolicy(t *testing.T) {
 	environment := new(BlackjackEnvironment)
 	policy := environment.CreateOptimizedPolicy(40, 100000, 5)
 
-	var state State
-	var action Action
+	var state monoikos.State
+	var action monoikos.Action
 
-	state = NewBasicState()
+	state = monoikos.NewBasicState()
 	state.GetContext()[playerContextKey] = "5"
 	state.GetContext()[dealerContextKey] = "18"
 	state.GetContext()[pairContextKey] = "true"
@@ -66,7 +67,7 @@ func TestOptimizeBlackjackPolicy(t *testing.T) {
 		t.Errorf("Expected optimized policy to Hit on 5 against 18, got '%v'.", action.GetId())
 	}
 
-	state = NewBasicState()
+	state = monoikos.NewBasicState()
 	state.GetContext()[playerContextKey] = "20"
 	state.GetContext()[dealerContextKey] = "15"
 	state.GetContext()[pairContextKey] = "false"
@@ -79,7 +80,7 @@ func TestOptimizeBlackjackPolicy(t *testing.T) {
 
 	/*
 		// Fails right now, need to debug.
-		state = NewBasicState()
+		state = monoikos.NewBasicState()
 		state.GetContext()[playerContextKey] = "11"
 		state.GetContext()[dealerContextKey] = "16"
 		state.GetContext()[pairContextKey] = "true"
@@ -94,22 +95,22 @@ func TestOptimizeBlackjackPolicy(t *testing.T) {
 
 type BlackjackEnvironment struct{}
 
-func (this *BlackjackEnvironment) CreateRandomPolicy() Policy {
+func (this *BlackjackEnvironment) CreateRandomPolicy() monoikos.Policy {
 
-	return CreateRandomPolicy(this)
+	return monoikos.CreateRandomPolicy(this)
 }
 
-func (this *BlackjackEnvironment) CreateImprovedPolicy(outcomes []Outcome) Policy {
+func (this *BlackjackEnvironment) CreateImprovedPolicy(outcomes []monoikos.Outcome) monoikos.Policy {
 
-	return CreateImprovedPolicy(this, outcomes)
+	return monoikos.CreateImprovedPolicy(this, outcomes)
 }
 
-func (this *BlackjackEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) Policy {
+func (this *BlackjackEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
 
-	return CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
+	return monoikos.CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
 }
 
-func (this *BlackjackEnvironment) CreateExperiment() Experiment {
+func (this *BlackjackEnvironment) CreateExperiment() monoikos.Experiment {
 
 	experiment := NewBlackjackExperiment()
 	id := blackjack.GetNextId()
@@ -119,29 +120,29 @@ func (this *BlackjackEnvironment) CreateExperiment() Experiment {
 	return experiment
 }
 
-func (this *BlackjackEnvironment) GetLegalActions(state State) []Action {
+func (this *BlackjackEnvironment) GetLegalActions(state monoikos.State) []monoikos.Action {
 
 	s, ok := state.GetContext()[pairContextKey]
 	if !ok {
-		return make([]Action, 0)
+		return make([]monoikos.Action, 0)
 	}
 
 	b, err := strconv.ParseBool(s)
 	if err != nil {
-		return make([]Action, 0)
+		return make([]monoikos.Action, 0)
 	}
 
-	var actions []Action
+	var actions []monoikos.Action
 
 	if !b {
 
-		actions = make([]Action, 2)
+		actions = make([]monoikos.Action, 2)
 		actions[0] = new(HitAction)
 		actions[1] = new(StandAction)
 
 	} else {
 
-		actions = make([]Action, 3)
+		actions = make([]monoikos.Action, 3)
 		actions[0] = new(HitAction)
 		actions[1] = new(StandAction)
 		actions[2] = new(DoubleAction)
@@ -150,9 +151,9 @@ func (this *BlackjackEnvironment) GetLegalActions(state State) []Action {
 	return actions
 }
 
-func (this *BlackjackEnvironment) GetKnownStates() []State {
+func (this *BlackjackEnvironment) GetKnownStates() []monoikos.State {
 
-	states := make([]State, 0)
+	states := make([]monoikos.State, 0)
 	for player := 2; player <= 21; player++ {
 		for dealer := 2; dealer <= 21; dealer++ {
 
@@ -162,7 +163,7 @@ func (this *BlackjackEnvironment) GetKnownStates() []State {
 				for p := 0; p <= 1; p++ {
 					pair := p != 0
 
-					state := NewBasicState()
+					state := monoikos.NewBasicState()
 					state.Context[playerContextKey] = strconv.Itoa(player)
 					state.Context[softContextKey] = strconv.FormatBool(soft)
 					state.Context[pairContextKey] = strconv.FormatBool(pair)
@@ -190,11 +191,11 @@ func NewBlackjackExperiment() *BlackjackExperiment {
 	return experiment
 }
 
-func (this *BlackjackExperiment) ObserveState() State {
+func (this *BlackjackExperiment) ObserveState() monoikos.State {
 
 	game := blackjack.Peek(this.Context[idContextKey].(uint64))
 
-	state := NewBasicState()
+	state := monoikos.NewBasicState()
 
 	player, soft := blackjack.Evaluate(game.Player)
 	state.Context[playerContextKey] = strconv.Itoa(player)
@@ -212,16 +213,16 @@ func (this *BlackjackExperiment) ObserveState() State {
 	return state
 }
 
-func (this *BlackjackExperiment) Run(policy Policy) []Outcome {
+func (this *BlackjackExperiment) Run(policy monoikos.Policy) []monoikos.Outcome {
 
-	basicOutcomes := make([]*BasicOutcome, 0)
+	basicOutcomes := make([]*monoikos.BasicOutcome, 0)
 	state := this.ObserveState()
 	for !state.IsTerminal() {
 
 		action := policy.GetAction(state)
 		action.Run(this.Context)
 
-		outcome := new(BasicOutcome)
+		outcome := new(monoikos.BasicOutcome)
 		outcome.InitialState = state
 		outcome.ActionTaken = action
 		basicOutcomes = append(basicOutcomes, outcome)
@@ -229,7 +230,7 @@ func (this *BlackjackExperiment) Run(policy Policy) []Outcome {
 		state = this.ObserveState()
 	}
 
-	outcomes := make([]Outcome, 0)
+	outcomes := make([]monoikos.Outcome, 0)
 	for _, outcome := range basicOutcomes {
 
 		outcome.FinalState = state
@@ -239,13 +240,13 @@ func (this *BlackjackExperiment) Run(policy Policy) []Outcome {
 	return outcomes
 }
 
-func (this *BlackjackExperiment) ForceRun(action Action, policy Policy) []Outcome {
+func (this *BlackjackExperiment) ForceRun(action monoikos.Action, policy monoikos.Policy) []monoikos.Outcome {
 
-	basicOutcomes := make([]*BasicOutcome, 0)
+	basicOutcomes := make([]*monoikos.BasicOutcome, 0)
 	state := this.ObserveState()
 
 	action.Run(this.Context)
-	outcome := new(BasicOutcome)
+	outcome := new(monoikos.BasicOutcome)
 	outcome.InitialState = state
 	outcome.ActionTaken = action
 	basicOutcomes = append(basicOutcomes, outcome)
@@ -256,7 +257,7 @@ func (this *BlackjackExperiment) ForceRun(action Action, policy Policy) []Outcom
 		action := policy.GetAction(state)
 		action.Run(this.Context)
 
-		outcome := new(BasicOutcome)
+		outcome := new(monoikos.BasicOutcome)
 		outcome.InitialState = state
 		outcome.ActionTaken = action
 		basicOutcomes = append(basicOutcomes, outcome)
@@ -264,7 +265,7 @@ func (this *BlackjackExperiment) ForceRun(action Action, policy Policy) []Outcom
 		state = this.ObserveState()
 	}
 
-	outcomes := make([]Outcome, 0)
+	outcomes := make([]monoikos.Outcome, 0)
 	for _, outcome := range basicOutcomes {
 
 		outcome.FinalState = state
