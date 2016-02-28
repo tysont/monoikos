@@ -1,7 +1,7 @@
 package main
 
 import (
-	//"fmt"
+	"fmt"
 	"math/rand"
 	"strconv"
 )
@@ -10,125 +10,36 @@ var countContextKey = "count"
 var doneContextKey = "done"
 var max = 20
 
-/*
-func main() {
+func PlayCount() {
 
 	environment := new(CountEnvironment)
-	policy := environment.CreateRandomPolicy()
-	policy.SetShakeRate(0)
+	policy := environment.CreateOptimizedPolicy(40, 100000, 5)
 
-	for i := 40; i >= 0; i -= 10 {
+	for i := 0; i < max; i++ {
 
-		n := 0
-		t := 0
-		policy.SetShakeRate(i)
-		outcomes := []Outcome{}
-		for j := 0; j < 100000; j++ {
-
-			r := 0
-			experiment := environment.CreateExperiment()
-			for _, outcome := range experiment.Run(policy) {
-
-				outcomes = append(outcomes, outcome)
-				r = outcome.GetReward()
-			}
-
-			n++
-			t += r
-		}
-
-		for i := 0; i < max; i++ {
-
-			state := NewBasicState()
-			state.GetContext()[countContextKey] = strconv.Itoa(i)
-			state.GetContext()[doneContextKey] = strconv.FormatBool(false)
-			action := policy.GetPreferredAction(state)
-			fmt.Printf("'%v'->'%v'\n", state.GetId(), action.GetId())
-		}
-
-		fmt.Printf("========================\n")
-		policy = environment.CreatePolicy(outcomes)
+		state := NewBasicState()
+		state.GetContext()[countContextKey] = strconv.Itoa(i)
+		state.GetContext()[doneContextKey] = strconv.FormatBool(false)
+		action := policy.GetPreferredAction(state)
+		fmt.Printf("'%v'->'%v'\n", state.GetId(), action.GetId())
 	}
-
 }
-*/
 
 type CountEnvironment struct{}
 
 func (this *CountEnvironment) CreateRandomPolicy() Policy {
 
-	policy := NewBasicPolicy()
-	policy.Environment = this
-	return policy
+	return CreateRandomPolicy(this)
 }
 
-func (this *CountEnvironment) CreatePolicy(outcomes []Outcome) Policy {
+func (this *CountEnvironment) CreateImprovedPolicy(outcomes []Outcome) Policy {
 
-	policy := NewBasicPolicy()
-	policy.Environment = this
+	return CreateImprovedPolicy(this, outcomes)
+}
 
-	occurences := make(map[string]int)
-	rewards := make(map[string]int)
-	for _, outcome := range outcomes {
+func (this *CountEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) Policy {
 
-		id := outcome.GetId()
-		if _, ok := occurences[id]; !ok {
-
-			occurences[id] = 0
-			rewards[id] = 0
-		}
-
-		occurences[id] = occurences[id] + 1
-		rewards[id] = rewards[id] + outcome.GetReward()
-	}
-
-	for _, state := range this.GetKnownStates() {
-
-		set := false
-		max := 0.0
-		var preferredAction Action
-		var otherActions []Action
-		for _, action := range this.GetLegalActions(state) {
-
-			outcome := BasicOutcome{InitialState: state, ActionTaken: action}
-			id := outcome.GetId()
-			if _, ok := occurences[id]; ok {
-
-				reward := float64(rewards[id]) / float64(occurences[id])
-				//fmt.Printf("%v: %v\n", id, strconv.FormatFloat(reward, 'f', 3, 64))
-				if !set {
-
-					set = true
-					max = reward
-					preferredAction = action
-
-				} else if reward > max {
-
-					max = reward
-					otherActions = append(otherActions, preferredAction)
-					preferredAction = action
-
-				} else {
-
-					otherActions = append(otherActions, action)
-				}
-			}
-		}
-
-		if set {
-
-			policy.AddState(state, preferredAction, otherActions)
-			//fmt.Printf("*%v <- %v\n", state.GetId(), preferredAction.GetId())
-
-		} else {
-
-			policy.AddRandomState(state)
-			//fmt.Printf("*%v <- Random\n", state.GetId())
-
-		}
-	}
-
-	return policy
+	return CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
 }
 
 func (this *CountEnvironment) CreateExperiment() Experiment {

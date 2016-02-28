@@ -1,16 +1,23 @@
 package main
 
 import (
-	//"fmt"
+	"fmt"
 	"math/rand"
 	"sort"
 	"strconv"
 	//"reflect"
 )
 
+func main() {
+
+	PlayBlackjack()
+
+}
+
 type Environment interface {
 	CreateRandomPolicy() Policy
-	CreatePolicy([]Outcome) Policy
+	CreateImprovedPolicy([]Outcome) Policy
+	CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) Policy
 	CreateExperiment() Experiment
 	GetLegalActions(State) []Action
 	GetKnownStates() []State
@@ -213,4 +220,112 @@ func (this *BasicOutcome) GetInitialState() State {
 func (this *BasicOutcome) GetFinalState() State {
 
 	return this.FinalState
+}
+
+func CreateRandomPolicy(environment Environment) Policy {
+
+	policy := NewBasicPolicy()
+	policy.Environment = environment
+	return policy
+}
+
+func CreateImprovedPolicy(environment Environment, outcomes []Outcome) Policy {
+
+	policy := NewBasicPolicy()
+	policy.Environment = environment
+
+	occurences := make(map[string]int)
+	rewards := make(map[string]int)
+	for _, outcome := range outcomes {
+
+		id := outcome.GetId()
+		if _, ok := occurences[id]; !ok {
+
+			occurences[id] = 0
+			rewards[id] = 0
+		}
+
+		occurences[id] = occurences[id] + 1
+		rewards[id] = rewards[id] + outcome.GetReward()
+	}
+
+	for _, state := range environment.GetKnownStates() {
+
+		set := false
+		max := 0.0
+		var preferredAction Action
+		var otherActions []Action
+		for _, action := range environment.GetLegalActions(state) {
+
+			outcome := BasicOutcome{InitialState: state, ActionTaken: action}
+			id := outcome.GetId()
+			if _, ok := occurences[id]; ok {
+
+				reward := float64(rewards[id]) / float64(occurences[id])
+				if !set {
+
+					set = true
+					max = reward
+					preferredAction = action
+
+				} else if reward > max {
+
+					max = reward
+					otherActions = append(otherActions, preferredAction)
+					preferredAction = action
+
+				} else {
+
+					otherActions = append(otherActions, action)
+				}
+			}
+		}
+
+		if set {
+
+			policy.AddState(state, preferredAction, otherActions)
+
+		} else {
+
+			policy.AddRandomState(state)
+
+		}
+	}
+
+	return policy
+}
+
+func CreateOptimizedPolicy(environment Environment, initialShakeRate int, experimentsPerIteration int, iterations int) Policy {
+
+	policy := environment.CreateRandomPolicy()
+
+	for i := (iterations - 1); i >= 0; i-- {
+
+		n := 0
+		t := 0
+
+		shakeRate := int(float64(initialShakeRate) * (float64(i) / float64(iterations-1)))
+		fmt.Println(shakeRate)
+		policy.SetShakeRate(shakeRate)
+
+		outcomes := []Outcome{}
+		for j := 0; j < experimentsPerIteration; j++ {
+
+			r := 0
+			experiment := environment.CreateExperiment()
+			for _, outcome := range experiment.Run(policy) {
+
+				outcomes = append(outcomes, outcome)
+				r = outcome.GetReward()
+			}
+
+			n++
+			t += r
+		}
+
+		policy = environment.CreateImprovedPolicy(outcomes)
+	}
+
+	policy.SetShakeRate(0)
+	return policy
 }

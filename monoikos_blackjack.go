@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	//"reflect"
+	"strconv"
 )
 
 var idContextKey = "id"
@@ -12,43 +12,16 @@ var pairContextKey = "pair"
 var softContextKey = "soft"
 var dealerContextKey = "dealer"
 
-func main() {
+func PlayBlackjack() {
 
 	Initiatlize()
 
 	environment := new(BlackjackEnvironment)
-	policy := environment.CreateRandomPolicy()
-	oldPolicy := policy
-
-	for i := 40; i >= 0; i -= 2 {
-
-		n := 0
-		t := 0
-		policy.SetShakeRate(i)
-		outcomes := make([]Outcome, 0)
-		for j := 0; j < 200000; j++ {
-
-			r := 0
-			experiment := environment.CreateExperiment()
-			for _, outcome := range experiment.Run(policy) {
-
-				outcomes = append(outcomes, outcome)
-				r = outcome.GetReward()
-			}
-
-			n++
-			t += r
-		}
-
-		//a := float64(t) / float64(n)
-		//fmt.Println(strconv.FormatFloat(a, 'f', 3, 64))
-		oldPolicy = policy
-		policy = environment.CreatePolicy(outcomes)
-	}
+	policy := environment.CreateOptimizedPolicy(40, 100000, 5)
 
 	for _, state := range environment.GetKnownStates() {
-		if state.GetContext()[playerContextKey] != "21" || state.GetContext()[pairContextKey] != "true" {
-			fmt.Printf("'%v'='%v'->'%v'\n", state.GetId(), oldPolicy.GetPreferredAction(state).GetId(), policy.GetPreferredAction(state).GetId())
+		if state.GetContext()[playerContextKey] != "21" && state.GetContext()[dealerContextKey] != "21" {
+			fmt.Printf("'%v'='%v'\n", state.GetId(), policy.GetPreferredAction(state).GetId())
 		}
 	}
 }
@@ -57,79 +30,17 @@ type BlackjackEnvironment struct{}
 
 func (this *BlackjackEnvironment) CreateRandomPolicy() Policy {
 
-	policy := NewBasicPolicy()
-	policy.Environment = this
-
-	return policy
+	return CreateRandomPolicy(this)
 }
 
-func (this *BlackjackEnvironment) CreatePolicy(outcomes []Outcome) Policy {
+func (this *BlackjackEnvironment) CreateImprovedPolicy(outcomes []Outcome) Policy {
 
-	policy := NewBasicPolicy()
-	policy.Environment = this
+	return CreateImprovedPolicy(this, outcomes)
+}
 
-	occurences := make(map[string]int)
-	rewards := make(map[string]int)
-	for _, outcome := range outcomes {
+func (this *BlackjackEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) Policy {
 
-		id := outcome.GetId()
-		if _, ok := occurences[id]; !ok {
-
-			occurences[id] = 0
-			rewards[id] = 0
-		}
-
-		occurences[id] = occurences[id] + 1
-		rewards[id] = rewards[id] + outcome.GetReward()
-	}
-
-	for _, state := range this.GetKnownStates() {
-
-		set := false
-		max := 0.0
-		var preferredAction Action
-		var otherActions []Action
-		for _, action := range this.GetLegalActions(state) {
-
-			outcome := BasicOutcome{InitialState: state, ActionTaken: action}
-			id := outcome.GetId()
-			if _, ok := occurences[id]; ok {
-
-				reward := float64(rewards[id]) / float64(occurences[id])
-				//fmt.Printf("%v: %v\n", id, strconv.FormatFloat(reward, 'f', 3, 64))
-				if !set {
-
-					set = true
-					max = reward
-					preferredAction = action
-
-				} else if reward > max {
-
-					max = reward
-					otherActions = append(otherActions, preferredAction)
-					preferredAction = action
-
-				} else {
-
-					otherActions = append(otherActions, action)
-				}
-			}
-		}
-
-		if set {
-
-			policy.AddState(state, preferredAction, otherActions)
-			//fmt.Printf("*%v <- %v\n", state.GetId(), preferredAction.GetId())
-
-		} else {
-
-			policy.AddRandomState(state)
-			//fmt.Printf("*%v <- Random\n", state.GetId())
-
-		}
-	}
-
-	return policy
+	return CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
 }
 
 func (this *BlackjackEnvironment) CreateExperiment() Experiment {
