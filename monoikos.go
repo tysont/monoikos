@@ -64,6 +64,7 @@ func NewBasicState() *BasicState {
 // values and whether the state is terminal into a string.
 func (this *BasicState) GetId() string {
 
+	// Get the list of context keys.
 	keys := make([]string, len(this.Context))
 	i := 0
 	for k, _ := range this.Context {
@@ -71,8 +72,10 @@ func (this *BasicState) GetId() string {
 		i++
 	}
 
+	// Sort them, important to make the identifier deterministic.
 	sort.Strings(keys)
 
+	// Concatenate them together in a somewhat legible format.
 	id := "["
 	i = 0
 	for _, k := range keys {
@@ -150,20 +153,25 @@ func NewBasicPolicy() *BasicPolicy {
 // another random action if randomization is triggered based on the randomization rate.
 func (this *BasicPolicy) GetAction(state State) Action {
 
+	// If the state hasn't been seen before, add it with a random action associated to it.
 	id := state.GetId()
 	if _, ok := this.KnownStates[id]; !ok {
 
 		this.AddRandomState(state)
 	}
 
+	// Pick a random number to see whether we should randomize.
 	k := rand.Intn(100)
 	l := len(this.OtherActions[id])
+
+	// If we know of other actions and should randomize, return a random other action.
 	if l > 0 && k < this.RandomizationRate {
 
 		m := rand.Intn(l)
 		return this.OtherActions[id][m]
 	}
 
+	// Otherwise return the preferred action.
 	return this.PreferredAction[id]
 }
 
@@ -178,10 +186,12 @@ func (this *BasicPolicy) AddRandomState(state State) {
 
 	actions := this.Environment.GetLegalActions(state)
 
+	// Select a random action from the list, and remove it from the other actions list.
 	k := rand.Intn(len(actions))
 	action := actions[k]
 	actions = append(actions[:k], actions[k+1:]...)
 
+	// Add the state with the randomly selected preferred action plus other actions.
 	this.AddState(state, action, actions)
 }
 
@@ -270,68 +280,106 @@ func CreateRandomPolicy(environment Environment) Policy {
 	return policy
 }
 
-// CreateImprovedPolicy is a utility function for creating an improved policy from an existing
-// policy and a set of outcomes.
-func CreateImprovedPolicy(environment Environment, outcomes []Outcome) Policy {
+// GetAverageRewards returns the average reward for each state represented in a set of outcomes.
+// In the future it may make sense to check for things like the least dense states in the list of
+// outcomes since those averages may not mean much.
+func GetAverageRewards(outcomes []Outcome) map[string]float64 {
 
-	policy := NewBasicPolicy()
-	policy.Environment = environment
-
+	// Get the raw occurences and total rewards for each state and action pair.
 	occurences := make(map[string]int)
-	rewards := make(map[string]int)
+	totalRewards := make(map[string]int)
 	for _, outcome := range outcomes {
 
 		id := outcome.GetId()
 		if _, ok := occurences[id]; !ok {
 
 			occurences[id] = 0
-			rewards[id] = 0
+			totalRewards[id] = 0
 		}
 
 		occurences[id] = occurences[id] + 1
-		rewards[id] = rewards[id] + outcome.GetReward()
+		totalRewards[id] = totalRewards[id] + outcome.GetReward()
 	}
 
-	for _, state := range environment.GetKnownStates() {
+	// Go back thru and calculate the average rewards for each state and action pair.
+	averageRewards := make(map[string]float64)
+	for id, _ := range occurences {
 
-		set := false
-		max := 0.0
-		var preferredAction Action
-		var otherActions []Action
-		for _, action := range environment.GetLegalActions(state) {
+		averageRewards[id] = float64(totalRewards[id]) / float64(occurences[id])
+	}
 
-			outcome := BasicOutcome{InitialState: state, ActionTaken: action}
-			id := outcome.GetId()
-			if _, ok := occurences[id]; ok {
+	return averageRewards
+}
 
-				reward := float64(rewards[id]) / float64(occurences[id])
-				if !set {
+// GetOptimalAction returns the optimal preferred action for a state based on a set of rewards for
+// outcomes, along with the other possible actions for the state.
+func GetOptimalAction(environment Environment, state State, rewards map[string]float64) (Action, []Action) {
 
-					set = true
-					max = reward
-					preferredAction = action
+	set := false
+	max := 0.0
 
-				} else if reward > max {
+	var preferredAction Action
+	var otherActions []Action
 
-					max = reward
-					otherActions = append(otherActions, preferredAction)
-					preferredAction = action
+	// Iterate over actions to find the one with the highest reward.
+	for _, action := range environment.GetLegalActions(state) {
 
-				} else {
+		outcome := BasicOutcome{InitialState: state, ActionTaken: action}
+		id := outcome.GetId()
+		if _, ok := rewards[id]; ok {
 
-					otherActions = append(otherActions, action)
-				}
+			// If this is the first reward that we've seen, use it.
+			reward := rewards[id]
+			if !set {
+
+				max = reward
+				preferredAction = action
+				set = true
+
+				// Otherwise if this reward is better, use it.
+			} else if reward > max {
+
+				max = reward
+				otherActions = append(otherActions, preferredAction)
+				preferredAction = action
+
+				// Or if the old reward was better, stick with it.
+			} else {
+
+				otherActions = append(otherActions, action)
 			}
 		}
+	}
 
-		if set {
+	// If we didn't find any rewards for this state, return nil.
+	if !set {
 
-			policy.AddState(state, preferredAction, otherActions)
+		return nil, nil
+	}
 
-		} else {
+	// Otherwise return the selected preferred action and other actions.
+	return preferredAction, otherActions
+}
+
+// CreateImprovedPolicy is a utility function for creating an improved policy from an existing
+// policy and a set of outcomes.
+func CreateImprovedPolicy(environment Environment, outcomes []Outcome) Policy {
+
+	rewards := GetAverageRewards(outcomes)
+	policy := NewBasicPolicy()
+	policy.Environment = environment
+
+	// For each state, add it to the policy with a preferred or randomized action.
+	for _, state := range environment.GetKnownStates() {
+
+		preferredAction, otherActions := GetOptimalAction(environment, state, rewards)
+		if preferredAction == nil {
 
 			policy.AddRandomState(state)
 
+		} else {
+
+			policy.AddState(state, preferredAction, otherActions)
 		}
 	}
 
@@ -346,14 +394,18 @@ func CreateOptimizedPolicy(environment Environment, initialRandomizationRate int
 
 	policy := environment.CreateRandomPolicy()
 
+	// Loop for the number of desired iterations.
+	// The -1 is because we always want an extra iteration at 0 randomization.
 	for i := (iterations - 1); i >= 0; i-- {
 
 		n := 0
 		t := 0
 
+		// Set a randomization rate that decreases with each iteration.
 		randomizationRate := int(float64(initialRandomizationRate) * (float64(i) / float64(iterations-1)))
 		policy.SetRandomizationRate(randomizationRate)
 
+		// Run experiments to generate sets of outcomes to improve the policy.
 		outcomes := []Outcome{}
 		for j := 0; j < experimentsPerIteration; j++ {
 
@@ -369,9 +421,11 @@ func CreateOptimizedPolicy(environment Environment, initialRandomizationRate int
 			t += r
 		}
 
+		// Create the improved policy and use it moving forward.
 		policy = environment.CreateImprovedPolicy(outcomes)
 	}
 
+	// Set the final randomization rate to zero and return the policy.
 	policy.SetRandomizationRate(0)
 	return policy
 }
