@@ -12,11 +12,11 @@ var countContextKey = "count"
 var doneContextKey = "done"
 var max = 20
 
-func TestZeroShakePolicyDeterminism(t *testing.T) {
+func TestZeroRandomizationPolicyDeterminism(t *testing.T) {
 
 	environment := new(CountEnvironment)
 	policy := environment.CreateRandomPolicy()
-	policy.SetShakeRate(0)
+	policy.SetRandomizationRate(0)
 
 	deterministic := true
 	id := ""
@@ -39,7 +39,7 @@ func TestZeroShakePolicyDeterminism(t *testing.T) {
 
 	if !deterministic {
 
-		t.Errorf("Expected policy with zero shake to return a deterministic action, but got different actions.")
+		t.Errorf("Expected policy with zero randomization to return a deterministic action, but got different actions.")
 	}
 }
 
@@ -47,7 +47,7 @@ func TestAddStateToPolicy(t *testing.T) {
 
 	environment := new(CountEnvironment)
 	policy := environment.CreateRandomPolicy()
-	policy.SetShakeRate(0)
+	policy.SetRandomizationRate(0)
 
 	experiment := environment.CreateExperiment()
 	state := experiment.ObserveState()
@@ -197,9 +197,9 @@ func (this *CountEnvironment) CreateImprovedPolicy(outcomes []monoikos.Outcome) 
 	return monoikos.CreateImprovedPolicy(this, outcomes)
 }
 
-func (this *CountEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
+func (this *CountEnvironment) CreateOptimizedPolicy(initialRandomizationRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
 
-	return monoikos.CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
+	return monoikos.CreateOptimizedPolicy(this, initialRandomizationRate, experimentsPerIteration, iterations)
 }
 
 func (this *CountEnvironment) CreateExperiment() monoikos.Experiment {

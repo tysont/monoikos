@@ -6,15 +6,15 @@ import (
 	"bitbucket.org/tysont/monoikos"
 )
 
-func TestSetShakeRate(t *testing.T) {
+func TestSetRandomizationRate(t *testing.T) {
 
 	n := 72
 
 	policy := monoikos.NewBasicPolicy()
-	policy.SetShakeRate(n)
+	policy.SetRandomizationRate(n)
 
-	if policy.GetShakeRate() != n {
+	if policy.GetRandomizationRate() != n {
 
-		t.Errorf("Expected shake rate to be set, and it wasn't.")
+		t.Errorf("Expected randomization rate to be set, and it wasn't.")
 	}
 }

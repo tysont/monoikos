@@ -105,9 +105,9 @@ func (this *BlackjackEnvironment) CreateImprovedPolicy(outcomes []monoikos.Outco
 	return monoikos.CreateImprovedPolicy(this, outcomes)
 }
 
-func (this *BlackjackEnvironment) CreateOptimizedPolicy(initialShakeRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
+func (this *BlackjackEnvironment) CreateOptimizedPolicy(initialRandomizationRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
 
-	return monoikos.CreateOptimizedPolicy(this, initialShakeRate, experimentsPerIteration, iterations)
+	return monoikos.CreateOptimizedPolicy(this, initialRandomizationRate, experimentsPerIteration, iterations)
 }
 
 func (this *BlackjackEnvironment) CreateExperiment() monoikos.Experiment {
