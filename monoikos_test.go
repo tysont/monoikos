@@ -3,7 +3,7 @@ package monoikos_test
 import (
 	"testing"
 
-	"bitbucket.org/tysont/monoikos"
+	"github.com/tysont/monoikos"
 )
 
 func TestSetRandomizationRate(t *testing.T) {

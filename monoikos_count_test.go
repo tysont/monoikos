@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"bitbucket.org/tysont/monoikos"
+	"github.com/tysont/monoikos"
 )
 
 var countContextKey = "count"

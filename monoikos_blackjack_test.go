@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"testing"
 
-	"bitbucket.org/tysont/monoikos"
 	"github.com/tysont/blackjack"
+	"github.com/tysont/monoikos"
 )
 
 var idContextKey = "id"
