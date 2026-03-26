@@ -1,3 +1,5 @@
+// ABOUTME: Blackjack environment for testing the reinforcement learning framework.
+// ABOUTME: The agent learns an optimal blackjack strategy (hit, stand, or double).
 package monoikos_test
 
 import (
@@ -8,305 +10,181 @@ import (
 	"github.com/tysont/monoikos"
 )
 
-var idContextKey = "id"
-var playerContextKey = "player"
-var pairContextKey = "pair"
-var softContextKey = "soft"
-var dealerContextKey = "dealer"
+const (
+	idContextKey     = "id"
+	playerContextKey = "player"
+	pairContextKey   = "pair"
+	softContextKey   = "soft"
+	dealerContextKey = "dealer"
+)
 
 func TestGetThreeLegalActions(t *testing.T) {
-
 	state := monoikos.NewBasicState()
-	state.Context[playerContextKey] = "10"
-	state.Context[pairContextKey] = "true"
-	state.Context[softContextKey] = "false"
-	state.Context[dealerContextKey] = "15"
+	state.Context()[playerContextKey] = "10"
+	state.Context()[pairContextKey] = "true"
+	state.Context()[softContextKey] = "false"
+	state.Context()[dealerContextKey] = "15"
 
-	environment := BlackjackEnvironment{}
-	actions := environment.GetLegalActions(state)
-	l := len(actions)
-
-	if l != 3 {
-		t.Errorf("Expected 3 legal actions for a pair of cards, got '%v'.", l)
+	env := &BlackjackEnvironment{}
+	actions := env.LegalActions(state)
+	if len(actions) != 3 {
+		t.Errorf("Expected 3 legal actions for a pair of cards, got '%v'.", len(actions))
 	}
 }
 
 func TestGetTwoLegalActions(t *testing.T) {
-
 	state := monoikos.NewBasicState()
-	state.Context[playerContextKey] = "14"
-	state.Context[dealerContextKey] = "15"
-	state.Context[pairContextKey] = "false"
-	state.Context[softContextKey] = "false"
+	state.Context()[playerContextKey] = "14"
+	state.Context()[dealerContextKey] = "15"
+	state.Context()[pairContextKey] = "false"
+	state.Context()[softContextKey] = "false"
 
-	environment := BlackjackEnvironment{}
-	actions := environment.GetLegalActions(state)
-	l := len(actions)
-
-	if l != 2 {
-		t.Errorf("Expected 2 legal actions for a non-pair of cards, got '%v'.", l)
+	env := &BlackjackEnvironment{}
+	actions := env.LegalActions(state)
+	if len(actions) != 2 {
+		t.Errorf("Expected 2 legal actions for a non-pair of cards, got '%v'.", len(actions))
 	}
 }
 
 func TestOptimizeBlackjackPolicy(t *testing.T) {
+	env := &BlackjackEnvironment{}
+	policy := monoikos.CreateOptimizedPolicy(env, 40, 100000, 5)
 
-	environment := new(BlackjackEnvironment)
-	policy := environment.CreateOptimizedPolicy(40, 100000, 5)
+	state := monoikos.NewBasicState()
+	state.Context()[playerContextKey] = "5"
+	state.Context()[dealerContextKey] = "18"
+	state.Context()[pairContextKey] = "true"
+	state.Context()[softContextKey] = "false"
 
-	var state monoikos.State
-	var action monoikos.Action
-
-	state = monoikos.NewBasicState()
-	state.GetContext()[playerContextKey] = "5"
-	state.GetContext()[dealerContextKey] = "18"
-	state.GetContext()[pairContextKey] = "true"
-	state.GetContext()[softContextKey] = "false"
-
-	action = policy.GetPreferredAction(state)
-	if action.GetId() != "Hit" {
-		t.Errorf("Expected optimized policy to Hit on 5 against 18, got '%v'.", action.GetId())
+	action := policy.PreferredAction(state)
+	if action.ID() != "Hit" {
+		t.Errorf("Expected optimized policy to Hit on 5 against 18, got '%v'.", action.ID())
 	}
 
 	state = monoikos.NewBasicState()
-	state.GetContext()[playerContextKey] = "20"
-	state.GetContext()[dealerContextKey] = "15"
-	state.GetContext()[pairContextKey] = "false"
-	state.GetContext()[softContextKey] = "false"
+	state.Context()[playerContextKey] = "20"
+	state.Context()[dealerContextKey] = "15"
+	state.Context()[pairContextKey] = "false"
+	state.Context()[softContextKey] = "false"
 
-	action = policy.GetPreferredAction(state)
-	if action.GetId() != "Stand" {
-		t.Errorf("Expected optimized policy to Stand on 20 against 15, got '%v'.", action.GetId())
+	action = policy.PreferredAction(state)
+	if action.ID() != "Stand" {
+		t.Errorf("Expected optimized policy to Stand on 20 against 15, got '%v'.", action.ID())
 	}
 
 	/*
 		// Fails right now, need to debug.
 		state = monoikos.NewBasicState()
-		state.GetContext()[playerContextKey] = "11"
-		state.GetContext()[dealerContextKey] = "16"
-		state.GetContext()[pairContextKey] = "true"
-		state.GetContext()[softContextKey] = "true"
+		state.Context()[playerContextKey] = "11"
+		state.Context()[dealerContextKey] = "16"
+		state.Context()[pairContextKey] = "true"
+		state.Context()[softContextKey] = "true"
 
-		action = policy.GetPreferredAction(state)
-		if action.GetId() != "Double" {
-			t.Errorf("Expected optimized policy to Double on 11 against 16, got '%v'.", action.GetId())
+		action = policy.PreferredAction(state)
+		if action.ID() != "Double" {
+			t.Errorf("Expected optimized policy to Double on 11 against 16, got '%v'.", action.ID())
 		}
 	*/
 }
 
+// BlackjackEnvironment is a domain where the agent learns optimal blackjack strategy.
 type BlackjackEnvironment struct{}
 
-func (this *BlackjackEnvironment) CreateRandomPolicy() monoikos.Policy {
-
-	return monoikos.CreateRandomPolicy(this)
-}
-
-func (this *BlackjackEnvironment) CreateImprovedPolicy(outcomes []monoikos.Outcome) monoikos.Policy {
-
-	return monoikos.CreateImprovedPolicy(this, outcomes)
-}
-
-func (this *BlackjackEnvironment) CreateOptimizedPolicy(initialRandomizationRate int, experimentsPerIteration int, iterations int) monoikos.Policy {
-
-	return monoikos.CreateOptimizedPolicy(this, initialRandomizationRate, experimentsPerIteration, iterations)
-}
-
-func (this *BlackjackEnvironment) CreateExperiment() monoikos.Experiment {
-
-	experiment := NewBlackjackExperiment()
+func (e *BlackjackEnvironment) CreateExperiment() monoikos.Experiment {
+	x := &BlackjackExperiment{
+		state: make(map[string]any),
+	}
 	id := blackjack.GetNextId()
-	experiment.Context[idContextKey] = id
+	x.state[idContextKey] = id
 	blackjack.Deal(id)
-
-	return experiment
+	return x
 }
 
-func (this *BlackjackEnvironment) GetLegalActions(state monoikos.State) []monoikos.Action {
-
-	s, ok := state.GetContext()[pairContextKey]
+func (e *BlackjackEnvironment) LegalActions(state monoikos.State) []monoikos.Action {
+	s, ok := state.Context()[pairContextKey]
 	if !ok {
-		return make([]monoikos.Action, 0)
+		return nil
 	}
-
-	b, err := strconv.ParseBool(s)
+	isPair, err := strconv.ParseBool(s)
 	if err != nil {
-		return make([]monoikos.Action, 0)
+		return nil
 	}
 
-	var actions []monoikos.Action
-
-	if !b {
-
-		actions = make([]monoikos.Action, 2)
-		actions[0] = new(HitAction)
-		actions[1] = new(StandAction)
-
-	} else {
-
-		actions = make([]monoikos.Action, 3)
-		actions[0] = new(HitAction)
-		actions[1] = new(StandAction)
-		actions[2] = new(DoubleAction)
+	if isPair {
+		return []monoikos.Action{&HitAction{}, &StandAction{}, &DoubleAction{}}
 	}
-
-	return actions
+	return []monoikos.Action{&HitAction{}, &StandAction{}}
 }
 
-func (this *BlackjackEnvironment) GetKnownStates() []monoikos.State {
-
-	states := make([]monoikos.State, 0)
+func (e *BlackjackEnvironment) KnownStates() []monoikos.State {
+	var states []monoikos.State
 	for player := 2; player <= 21; player++ {
 		for dealer := 2; dealer <= 21; dealer++ {
-
-			for s := 0; s <= 1; s++ {
-				soft := s != 0
-
-				for p := 0; p <= 1; p++ {
-					pair := p != 0
-
-					state := monoikos.NewBasicState()
-					state.Context[playerContextKey] = strconv.Itoa(player)
-					state.Context[softContextKey] = strconv.FormatBool(soft)
-					state.Context[pairContextKey] = strconv.FormatBool(pair)
-					state.Context[dealerContextKey] = strconv.Itoa(dealer)
-					state.Terminal = false
-
-					states = append(states, state)
+			for _, soft := range []bool{false, true} {
+				for _, pair := range []bool{false, true} {
+					s := monoikos.NewBasicState()
+					s.Context()[playerContextKey] = strconv.Itoa(player)
+					s.Context()[softContextKey] = strconv.FormatBool(soft)
+					s.Context()[pairContextKey] = strconv.FormatBool(pair)
+					s.Context()[dealerContextKey] = strconv.Itoa(dealer)
+					s.Terminal = false
+					states = append(states, s)
 				}
 			}
 		}
 	}
-
 	return states
 }
 
+// BlackjackExperiment is a single hand of blackjack.
 type BlackjackExperiment struct {
-	Context map[string]interface{}
+	state map[string]any
 }
 
-func NewBlackjackExperiment() *BlackjackExperiment {
+func (x *BlackjackExperiment) ObserveState() monoikos.State {
+	game := blackjack.Peek(x.state[idContextKey].(uint64))
 
-	experiment := new(BlackjackExperiment)
-	experiment.Context = make(map[string]interface{})
-
-	return experiment
-}
-
-func (this *BlackjackExperiment) ObserveState() monoikos.State {
-
-	game := blackjack.Peek(this.Context[idContextKey].(uint64))
-
-	state := monoikos.NewBasicState()
-
+	s := monoikos.NewBasicState()
 	player, soft := blackjack.Evaluate(game.Player)
-	state.Context[playerContextKey] = strconv.Itoa(player)
-	state.Context[softContextKey] = strconv.FormatBool(soft)
-
-	pair := len(game.Player) == 2
-	state.Context[pairContextKey] = strconv.FormatBool(pair)
+	s.Context()[playerContextKey] = strconv.Itoa(player)
+	s.Context()[softContextKey] = strconv.FormatBool(soft)
+	s.Context()[pairContextKey] = strconv.FormatBool(len(game.Player) == 2)
 
 	dealer, _ := blackjack.Evaluate(game.Dealer)
-	state.Context[dealerContextKey] = strconv.Itoa(dealer)
+	s.Context()[dealerContextKey] = strconv.Itoa(dealer)
 
-	state.Terminal = game.Complete
-	state.Reward = game.Payout
-
-	return state
+	s.Terminal = game.Complete
+	s.RewardVal = float64(game.Payout)
+	return s
 }
 
-func (this *BlackjackExperiment) Run(policy monoikos.Policy) []monoikos.Outcome {
-
-	basicOutcomes := make([]*monoikos.BasicOutcome, 0)
-	state := this.ObserveState()
-	for !state.IsTerminal() {
-
-		action := policy.GetAction(state)
-		action.Run(this.Context)
-
-		outcome := new(monoikos.BasicOutcome)
-		outcome.InitialState = state
-		outcome.ActionTaken = action
-		basicOutcomes = append(basicOutcomes, outcome)
-
-		state = this.ObserveState()
-	}
-
-	outcomes := make([]monoikos.Outcome, 0)
-	for _, outcome := range basicOutcomes {
-
-		outcome.FinalState = state
-		outcomes = append(outcomes, outcome)
-	}
-
-	return outcomes
+func (x *BlackjackExperiment) Context() map[string]any {
+	return x.state
 }
 
-func (this *BlackjackExperiment) ForceRun(action monoikos.Action, policy monoikos.Policy) []monoikos.Outcome {
-
-	basicOutcomes := make([]*monoikos.BasicOutcome, 0)
-	state := this.ObserveState()
-
-	action.Run(this.Context)
-	outcome := new(monoikos.BasicOutcome)
-	outcome.InitialState = state
-	outcome.ActionTaken = action
-	basicOutcomes = append(basicOutcomes, outcome)
-
-	state = this.ObserveState()
-	for !state.IsTerminal() {
-
-		action := policy.GetAction(state)
-		action.Run(this.Context)
-
-		outcome := new(monoikos.BasicOutcome)
-		outcome.InitialState = state
-		outcome.ActionTaken = action
-		basicOutcomes = append(basicOutcomes, outcome)
-
-		state = this.ObserveState()
-	}
-
-	outcomes := make([]monoikos.Outcome, 0)
-	for _, outcome := range basicOutcomes {
-
-		outcome.FinalState = state
-		outcomes = append(outcomes, outcome)
-	}
-
-	return outcomes
-}
-
+// HitAction draws another card.
 type HitAction struct{}
 
-func (this *HitAction) Run(context map[string]interface{}) {
-
-	blackjack.Hit(context[idContextKey].(uint64))
+func (a *HitAction) Run(ctx map[string]any) {
+	blackjack.Hit(ctx[idContextKey].(uint64))
 }
 
-func (this *HitAction) GetId() string {
+func (a *HitAction) ID() string { return "Hit" }
 
-	return "Hit"
-}
-
+// DoubleAction doubles down (draw one card, double the bet).
 type DoubleAction struct{}
 
-func (this *DoubleAction) Run(context map[string]interface{}) {
-
-	blackjack.Double(context[idContextKey].(uint64))
+func (a *DoubleAction) Run(ctx map[string]any) {
+	blackjack.Double(ctx[idContextKey].(uint64))
 }
 
-func (this *DoubleAction) GetId() string {
+func (a *DoubleAction) ID() string { return "Double" }
 
-	return "Double"
-}
-
+// StandAction keeps the current hand.
 type StandAction struct{}
 
-func (this *StandAction) Run(context map[string]interface{}) {
-
-	blackjack.Stand(context[idContextKey].(uint64))
+func (a *StandAction) Run(ctx map[string]any) {
+	blackjack.Stand(ctx[idContextKey].(uint64))
 }
 
-func (this *StandAction) GetId() string {
-
-	return "Stand"
-}
+func (a *StandAction) ID() string { return "Stand" }

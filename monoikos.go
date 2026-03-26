@@ -1,431 +1,311 @@
+// ABOUTME: Core reinforcement learning framework implementing Monte Carlo policy optimization.
+// ABOUTME: Provides interfaces and default implementations for environments, policies, states, actions, and outcomes.
 package monoikos
 
 import (
-	"math/rand"
+	"fmt"
+	"math/rand/v2"
 	"sort"
-	"strconv"
+	"strings"
 )
 
-// Environment contains all aspects of a domain in which reinforcement learning may be applied.
-// It handles things like creating and iterating on policies, and keeping tabs on the sets of
-// known states and actions that can be taken in a given state.
+// Environment defines a domain in which reinforcement learning can be applied.
+// Implementations provide domain-specific experiment creation, legal actions per state,
+// and the set of known states for policy construction.
 type Environment interface {
-	CreateRandomPolicy() Policy
-	CreateImprovedPolicy([]Outcome) Policy
-	CreateOptimizedPolicy(initialRandomizationRate int, experimentsPerIteration int, iterations int) Policy
 	CreateExperiment() Experiment
-	GetLegalActions(State) []Action
-	GetKnownStates() []State
+	LegalActions(State) []Action
+	KnownStates() []State
 }
 
-// Experiment is a single instance of a walk thru a domain that generates outcomes.
-// It can be run, and it provides the ability to observe the current state or force the
-// execution of a particular action.
+// Experiment is a single episode through an environment. ObserveState returns
+// the current snapshot; Context returns the mutable state that actions operate on.
+// The framework drives the run loop via RunExperiment.
 type Experiment interface {
 	ObserveState() State
-	Run(Policy) []Outcome
-	ForceRun(Action, Policy) []Outcome
+	Context() map[string]any
 }
 
-// Action is a step that can be executed with context at any point in time.
-// It includes a way to get an identifier that could be unique to the type or the action instance,
-// and it can be executed by passing in context.
+// Action is a step that can be executed within an experiment context.
 type Action interface {
-	GetId() string
-	Run(map[string]interface{})
+	ID() string
+	Run(map[string]any)
 }
 
 // State is a snapshot of an experiment at a point in time.
-// It includes a unique identifier of the state, a context, and information about whether
-// the state is terminal and what reward has been paid out (typically zero unless terminal).
 type State interface {
-	GetId() string
+	ID() string
 	IsTerminal() bool
-	GetContext() map[string]string
-	GetReward() int
+	Context() map[string]string
+	Reward() float64
 }
 
-// BasicState is a super simple and fairly generic implementation of a state with broad applicability.
+// Policy decides which action to take in a given state.
+type Policy interface {
+	Action(State) Action
+	PreferredAction(State) Action
+}
+
+// Outcome is the result of taking an action in a state during an experiment.
+type Outcome interface {
+	Reward() float64
+	InitialState() State
+	FinalState() State
+	Action() Action
+}
+
+// BasicState is a generic implementation of State backed by a string context map.
 type BasicState struct {
-	Context  map[string]string
-	Terminal bool
-	Reward   int
+	ContextMap map[string]string
+	Terminal   bool
+	RewardVal  float64
 }
 
-// NewBasicState should be used to create a BasicState; it handles instantiating members appropriately.
+// NewBasicState creates a BasicState with an initialized context map.
 func NewBasicState() *BasicState {
-
-	state := new(BasicState)
-	state.Context = make(map[string]string)
-	return state
+	return &BasicState{
+		ContextMap: make(map[string]string),
+	}
 }
 
-// GetId returns an identifier that uniquely identifies the state by concatenating the contextual
-// values and whether the state is terminal into a string.
-func (this *BasicState) GetId() string {
-
-	// Get the list of context keys.
-	keys := make([]string, len(this.Context))
-	i := 0
-	for k, _ := range this.Context {
-		keys[i] = k
-		i++
+// ID returns a deterministic identifier built from sorted context key-value pairs.
+func (s *BasicState) ID() string {
+	keys := make([]string, 0, len(s.ContextMap))
+	for k := range s.ContextMap {
+		keys = append(keys, k)
 	}
-
-	// Sort them, important to make the identifier deterministic.
 	sort.Strings(keys)
 
-	// Concatenate them together in a somewhat legible format.
-	id := "["
-	i = 0
-	for _, k := range keys {
-
+	var b strings.Builder
+	b.WriteString("[")
+	for i, k := range keys {
 		if i > 0 {
-			id += " "
+			b.WriteString(" ")
 		}
-
-		id += k
-		id += ":"
-		id += this.Context[k]
-
-		i++
+		fmt.Fprintf(&b, "%s:%s", k, s.ContextMap[k])
 	}
-
-	id += " terminal:"
-	id += strconv.FormatBool(this.Terminal)
-	id += "]"
-
-	return id
+	fmt.Fprintf(&b, " terminal:%t]", s.Terminal)
+	return b.String()
 }
 
-// IsTerminal returns whether the state is terminal.
-func (this *BasicState) IsTerminal() bool {
+func (s *BasicState) IsTerminal() bool           { return s.Terminal }
+func (s *BasicState) Context() map[string]string { return s.ContextMap }
+func (s *BasicState) Reward() float64            { return s.RewardVal }
 
-	return this.Terminal
-}
-
-// GetContext returns the state's context.
-func (this *BasicState) GetContext() map[string]string {
-
-	return this.Context
-}
-
-// GetReward returns the state's reward, which is typically zero if the state isn't terminal.
-func (this *BasicState) GetReward() int {
-
-	return this.Reward
-}
-
-// Policy is a decision making process for which actions should be taken in which states.
-// Creating a Policy generally involves iterating on a previous policy to generate outcomes, and then
-// crafting a new policy from those outcomes in succession.
-type Policy interface {
-	GetAction(State) Action
-	GetPreferredAction(State) Action
-	AddRandomState(State)
-	AddState(State, Action, []Action)
-	SetRandomizationRate(int)
-	GetRandomizationRate() int
-}
-
-// BasicPolicy is a straightforward and fairly generic implementation of a policy with broad applicability.
+// BasicPolicy is a generic policy that tracks a preferred action and alternatives per state,
+// with configurable randomization for exploration.
 type BasicPolicy struct {
 	RandomizationRate int
-	Environment       Environment
+	Env               Environment
 	KnownStates       map[string]State
-	PreferredAction   map[string]Action
+	PreferredActions  map[string]Action
 	OtherActions      map[string][]Action
 }
 
-// NewBasicPolicy should be used to create a BasicPolicy; it handles instantiating members appropriately.
+// NewBasicPolicy creates a BasicPolicy with initialized maps and a default randomization rate.
 func NewBasicPolicy() *BasicPolicy {
-
-	policy := new(BasicPolicy)
-	policy.RandomizationRate = 40
-	policy.KnownStates = make(map[string]State)
-	policy.PreferredAction = make(map[string]Action)
-	policy.OtherActions = make(map[string][]Action)
-
-	return policy
+	return &BasicPolicy{
+		RandomizationRate: 40,
+		KnownStates:       make(map[string]State),
+		PreferredActions:  make(map[string]Action),
+		OtherActions:      make(map[string][]Action),
+	}
 }
 
-// GetAction returns an action for a given state that could either be the preferred action, or
-// another random action if randomization is triggered based on the randomization rate.
-func (this *BasicPolicy) GetAction(state State) Action {
-
-	// If the state hasn't been seen before, add it with a random action associated to it.
-	id := state.GetId()
-	if _, ok := this.KnownStates[id]; !ok {
-
-		this.AddRandomState(state)
+// Action returns the preferred action for a state, or a random alternative
+// based on the randomization rate.
+func (p *BasicPolicy) Action(state State) Action {
+	id := state.ID()
+	if _, ok := p.KnownStates[id]; !ok {
+		p.AddRandomState(state)
 	}
 
-	// Pick a random number to see whether we should randomize.
-	k := rand.Intn(100)
-	l := len(this.OtherActions[id])
-
-	// If we know of other actions and should randomize, return a random other action.
-	if l > 0 && k < this.RandomizationRate {
-
-		m := rand.Intn(l)
-		return this.OtherActions[id][m]
+	k := rand.IntN(100)
+	l := len(p.OtherActions[id])
+	if l > 0 && k < p.RandomizationRate {
+		return p.OtherActions[id][rand.IntN(l)]
 	}
-
-	// Otherwise return the preferred action.
-	return this.PreferredAction[id]
+	return p.PreferredActions[id]
 }
 
-// GetPreferredAction returns the preferred action, and never uses any randomization.
-func (this *BasicPolicy) GetPreferredAction(state State) Action {
-
-	return this.PreferredAction[state.GetId()]
+// PreferredAction returns the preferred action without any randomization.
+func (p *BasicPolicy) PreferredAction(state State) Action {
+	return p.PreferredActions[state.ID()]
 }
 
-// AddRandomState adds a state to the policy and picks a random action as the state preferred action.
-func (this *BasicPolicy) AddRandomState(state State) {
-
-	actions := this.Environment.GetLegalActions(state)
-
-	// Select a random action from the list, and remove it from the other actions list.
-	k := rand.Intn(len(actions))
-	action := actions[k]
-	actions = append(actions[:k], actions[k+1:]...)
-
-	// Add the state with the randomly selected preferred action plus other actions.
-	this.AddState(state, action, actions)
+// AddRandomState adds a state with a randomly selected preferred action.
+func (p *BasicPolicy) AddRandomState(state State) {
+	actions := p.Env.LegalActions(state)
+	k := rand.IntN(len(actions))
+	preferred := actions[k]
+	others := append(actions[:k], actions[k+1:]...)
+	p.AddState(state, preferred, others)
 }
 
-// AddState adds a state to the policy and uses the specified action as the state preferred action.
-func (this *BasicPolicy) AddState(state State, preferredAction Action, otherActions []Action) {
-
-	id := state.GetId()
-	this.KnownStates[id] = state
-	this.PreferredAction[id] = preferredAction
-	this.OtherActions[id] = otherActions
+// AddState adds a state with a specific preferred action and alternatives.
+func (p *BasicPolicy) AddState(state State, preferred Action, others []Action) {
+	id := state.ID()
+	p.KnownStates[id] = state
+	p.PreferredActions[id] = preferred
+	p.OtherActions[id] = others
 }
 
-// SetRandomizationRate sets the rate where a random other action will be picked instead of using
-// the preferred action.  It must be a number between 0 and 100, and should typically be less
-// than 50 for most cases.
-func (this *BasicPolicy) SetRandomizationRate(randomizationRate int) {
-
-	this.RandomizationRate = randomizationRate
-}
-
-// GetRandomizationRate gets the rate where a random other action will be picked instead of using
-// the preferred action.
-func (this *BasicPolicy) GetRandomizationRate() int {
-
-	return this.RandomizationRate
-}
-
-// Outcome is the result of choosing a set of actions during an experiment (which will generate
-// a list of outcomes; one per each state in the experiment).  It has an identifier which can uniquely
-// identify the state/reward pair, the initial and final state pair, and the reward.
-type Outcome interface {
-	GetId() string
-	GetReward() int
-	GetInitialState() State
-	GetFinalState() State
-}
-
-// BasicOutcome is a simple implementation of Outcome that is broadly applicable.
+// BasicOutcome is a generic implementation of Outcome.
 type BasicOutcome struct {
-	InitialState State
-	ActionTaken  Action
-	FinalState   State
+	Initial     State
+	ActionTaken Action
+	Final       State
 }
 
-// GetId returns an identifier that uniquely identifies the outcome by concatenating the identifier
-// of the state and the identifier of the action taken into a string.
-func (this *BasicOutcome) GetId() string {
+func (o *BasicOutcome) Reward() float64     { return o.Final.Reward() }
+func (o *BasicOutcome) InitialState() State { return o.Initial }
+func (o *BasicOutcome) FinalState() State   { return o.Final }
+func (o *BasicOutcome) Action() Action      { return o.ActionTaken }
 
-	s := "["
-	s += this.InitialState.GetId()
-	s += " => "
-	s += this.ActionTaken.GetId()
-	s += "]"
-
-	return s
+// outcomeKey returns a composite key identifying a state-action pair for reward aggregation.
+func outcomeKey(initial State, action Action) string {
+	return "[" + initial.ID() + " => " + action.ID() + "]"
 }
 
-// GetReward returns the reward that was attained as part of the outcome by following the action
-// from the initial state.
-func (this *BasicOutcome) GetReward() int {
+// RunExperiment drives an experiment to completion using the given policy,
+// collecting outcomes for each state transition.
+func RunExperiment(experiment Experiment, policy Policy) []Outcome {
+	var pending []*BasicOutcome
+	state := experiment.ObserveState()
+	for !state.IsTerminal() {
+		action := policy.Action(state)
+		action.Run(experiment.Context())
+		outcome := &BasicOutcome{Initial: state, ActionTaken: action}
+		pending = append(pending, outcome)
+		state = experiment.ObserveState()
+	}
 
-	return this.FinalState.GetReward()
+	outcomes := make([]Outcome, len(pending))
+	for i, o := range pending {
+		o.Final = state
+		outcomes[i] = o
+	}
+	return outcomes
 }
 
-// GetInitialState returns the initial state for the particular outcome.  Note that an outcome is
-// only a pair of initial and end states, so a unique pair will be created for each state that is
-// visited until the terminal state is reached.
-func (this *BasicOutcome) GetInitialState() State {
+// ForceRunExperiment runs an experiment, forcing a specific first action
+// then following the policy for subsequent steps.
+func ForceRunExperiment(experiment Experiment, firstAction Action, policy Policy) []Outcome {
+	var pending []*BasicOutcome
+	state := experiment.ObserveState()
 
-	return this.InitialState
+	firstAction.Run(experiment.Context())
+	pending = append(pending, &BasicOutcome{Initial: state, ActionTaken: firstAction})
+	state = experiment.ObserveState()
+
+	for !state.IsTerminal() {
+		action := policy.Action(state)
+		action.Run(experiment.Context())
+		pending = append(pending, &BasicOutcome{Initial: state, ActionTaken: action})
+		state = experiment.ObserveState()
+	}
+
+	outcomes := make([]Outcome, len(pending))
+	for i, o := range pending {
+		o.Final = state
+		outcomes[i] = o
+	}
+	return outcomes
 }
 
-// GetFinalState returns the final state for the particular outcome.
-func (this *BasicOutcome) GetFinalState() State {
-
-	return this.FinalState
+// CreateRandomPolicy creates a new policy with random action selection for an environment.
+func CreateRandomPolicy(env Environment) *BasicPolicy {
+	p := NewBasicPolicy()
+	p.Env = env
+	return p
 }
 
-// CreateRandomPolicy is a utility function for crafting a random policy.  The current implementation
-// is light enough that it may not warrant it's own function, but it's likely that more will be
-// added here in the future.
-func CreateRandomPolicy(environment Environment) Policy {
-
-	policy := NewBasicPolicy()
-	policy.Environment = environment
-	return policy
-}
-
-// GetAverageRewards returns the average reward for each state represented in a set of outcomes.
-// In the future it may make sense to check for things like the least dense states in the list of
-// outcomes since those averages may not mean much.
+// GetAverageRewards computes the average reward for each state-action pair in a set of outcomes.
 func GetAverageRewards(outcomes []Outcome) map[string]float64 {
-
-	// Get the raw occurences and total rewards for each state and action pair.
-	occurences := make(map[string]int)
-	totalRewards := make(map[string]int)
-	for _, outcome := range outcomes {
-
-		id := outcome.GetId()
-		if _, ok := occurences[id]; !ok {
-
-			occurences[id] = 0
-			totalRewards[id] = 0
-		}
-
-		occurences[id] = occurences[id] + 1
-		totalRewards[id] = totalRewards[id] + outcome.GetReward()
+	counts := make(map[string]int)
+	totals := make(map[string]float64)
+	for _, o := range outcomes {
+		key := outcomeKey(o.InitialState(), o.Action())
+		counts[key]++
+		totals[key] += o.Reward()
 	}
 
-	// Go back thru and calculate the average rewards for each state and action pair.
-	averageRewards := make(map[string]float64)
-	for id, _ := range occurences {
-
-		averageRewards[id] = float64(totalRewards[id]) / float64(occurences[id])
+	averages := make(map[string]float64, len(counts))
+	for key := range counts {
+		averages[key] = totals[key] / float64(counts[key])
 	}
-
-	return averageRewards
+	return averages
 }
 
-// GetOptimalAction returns the optimal preferred action for a state based on a set of rewards for
-// outcomes, along with the other possible actions for the state.
-func GetOptimalAction(environment Environment, state State, rewards map[string]float64) (Action, []Action) {
-
+// GetOptimalAction finds the action with the highest average reward for a given state.
+func GetOptimalAction(env Environment, state State, rewards map[string]float64) (Action, []Action) {
 	set := false
 	max := 0.0
 
-	var preferredAction Action
-	var otherActions []Action
+	var preferred Action
+	var others []Action
 
-	// Iterate over actions to find the one with the highest reward.
-	for _, action := range environment.GetLegalActions(state) {
-
-		outcome := BasicOutcome{InitialState: state, ActionTaken: action}
-		id := outcome.GetId()
-		if _, ok := rewards[id]; ok {
-
-			// If this is the first reward that we've seen, use it.
-			reward := rewards[id]
-			if !set {
-
-				max = reward
-				preferredAction = action
-				set = true
-
-				// Otherwise if this reward is better, use it.
-			} else if reward > max {
-
-				max = reward
-				otherActions = append(otherActions, preferredAction)
-				preferredAction = action
-
-				// Or if the old reward was better, stick with it.
-			} else {
-
-				otherActions = append(otherActions, action)
-			}
+	for _, action := range env.LegalActions(state) {
+		key := outcomeKey(state, action)
+		reward, ok := rewards[key]
+		if !ok {
+			continue
+		}
+		if !set {
+			max = reward
+			preferred = action
+			set = true
+		} else if reward > max {
+			max = reward
+			others = append(others, preferred)
+			preferred = action
+		} else {
+			others = append(others, action)
 		}
 	}
 
-	// If we didn't find any rewards for this state, return nil.
 	if !set {
-
 		return nil, nil
 	}
-
-	// Otherwise return the selected preferred action and other actions.
-	return preferredAction, otherActions
+	return preferred, others
 }
 
-// CreateImprovedPolicy is a utility function for creating an improved policy from an existing
-// policy and a set of outcomes.
-func CreateImprovedPolicy(environment Environment, outcomes []Outcome) Policy {
-
+// CreateImprovedPolicy builds a new policy by selecting the best action per state
+// based on observed outcomes.
+func CreateImprovedPolicy(env Environment, outcomes []Outcome) *BasicPolicy {
 	rewards := GetAverageRewards(outcomes)
-	policy := NewBasicPolicy()
-	policy.Environment = environment
+	p := NewBasicPolicy()
+	p.Env = env
 
-	// For each state, add it to the policy with a preferred or randomized action.
-	for _, state := range environment.GetKnownStates() {
-
-		preferredAction, otherActions := GetOptimalAction(environment, state, rewards)
-		if preferredAction == nil {
-
-			policy.AddRandomState(state)
-
+	for _, state := range env.KnownStates() {
+		preferred, others := GetOptimalAction(env, state, rewards)
+		if preferred == nil {
+			p.AddRandomState(state)
 		} else {
-
-			policy.AddState(state, preferredAction, otherActions)
+			p.AddState(state, preferred, others)
 		}
 	}
-
-	return policy
+	return p
 }
 
-// CreateOptimizedPolicy is a utility function for running iterations of generating a random policy,
-// testing the policy and keeping track of outcomes, and then iterating again and generating a
-// better policy.  The policy that is returned should be fairly optimized, assuming that the environment
-// and state space was defined correctly, and the tuning parameters were reasonable.
-func CreateOptimizedPolicy(environment Environment, initialRandomizationRate int, experimentsPerIteration int, iterations int) Policy {
+// CreateOptimizedPolicy iterates over rounds of experimentation and improvement,
+// decreasing the randomization rate each round to converge on an optimal policy.
+func CreateOptimizedPolicy(env Environment, initialRandomizationRate int, experimentsPerIteration int, iterations int) *BasicPolicy {
+	policy := CreateRandomPolicy(env)
 
-	policy := environment.CreateRandomPolicy()
-
-	// Loop for the number of desired iterations.
-	// The -1 is because we always want an extra iteration at 0 randomization.
-	for i := (iterations - 1); i >= 0; i-- {
-
-		n := 0
-		t := 0
-
-		// Set a randomization rate that decreases with each iteration.
+	for i := iterations - 1; i >= 0; i-- {
 		randomizationRate := int(float64(initialRandomizationRate) * (float64(i) / float64(iterations-1)))
-		policy.SetRandomizationRate(randomizationRate)
+		policy.RandomizationRate = randomizationRate
 
-		// Run experiments to generate sets of outcomes to improve the policy.
-		outcomes := []Outcome{}
+		var outcomes []Outcome
 		for j := 0; j < experimentsPerIteration; j++ {
-
-			r := 0
-			experiment := environment.CreateExperiment()
-			for _, outcome := range experiment.Run(policy) {
-
-				outcomes = append(outcomes, outcome)
-				r = outcome.GetReward()
-			}
-
-			n++
-			t += r
+			experiment := env.CreateExperiment()
+			outcomes = append(outcomes, RunExperiment(experiment, policy)...)
 		}
 
-		// Create the improved policy and use it moving forward.
-		policy = environment.CreateImprovedPolicy(outcomes)
+		policy = CreateImprovedPolicy(env, outcomes)
 	}
 
-	// Set the final randomization rate to zero and return the policy.
-	policy.SetRandomizationRate(0)
+	policy.RandomizationRate = 0
 	return policy
 }

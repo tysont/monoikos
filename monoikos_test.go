@@ -1,3 +1,5 @@
+// ABOUTME: Unit tests for core monoikos framework types.
+// ABOUTME: Validates basic policy behavior like randomization rate configuration.
 package monoikos_test
 
 import (
@@ -7,14 +9,11 @@ import (
 )
 
 func TestSetRandomizationRate(t *testing.T) {
-
 	n := 72
-
 	policy := monoikos.NewBasicPolicy()
-	policy.SetRandomizationRate(n)
+	policy.RandomizationRate = n
 
-	if policy.GetRandomizationRate() != n {
-
-		t.Errorf("Expected randomization rate to be set, and it wasn't.")
+	if policy.RandomizationRate != n {
+		t.Errorf("Expected randomization rate to be %d, got %d.", n, policy.RandomizationRate)
 	}
 }
