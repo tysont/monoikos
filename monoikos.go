@@ -4,6 +4,7 @@ package monoikos
 
 import (
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"sort"
 	"strings"
@@ -52,6 +53,37 @@ type Outcome interface {
 	InitialState() State
 	FinalState() State
 	Action() Action
+}
+
+// TrainingConfig holds parameters for policy optimization.
+type TrainingConfig struct {
+	// InitialExplorationRate is the starting probability (0-100) of choosing a random
+	// action instead of the preferred one. Decreases linearly to 0 across iterations.
+	InitialExplorationRate int
+
+	// ExperimentsPerIteration is the number of episodes to run per training iteration.
+	ExperimentsPerIteration int
+
+	// Iterations is the number of training rounds.
+	Iterations int
+
+	// DiscountFactor (gamma) controls how much future rewards are worth relative to
+	// immediate rewards. 1.0 means no discounting; 0.9 is a common choice.
+	// A value of 0 is treated as 1.0 (no discounting) for backwards compatibility.
+	DiscountFactor float64
+
+	// FirstVisitOnly controls whether to use first-visit Monte Carlo (true) or
+	// every-visit Monte Carlo (false). First-visit only counts the first time a
+	// state-action pair appears in an episode, which typically converges faster.
+	FirstVisitOnly bool
+}
+
+// IterationStats captures metrics from a single training iteration.
+type IterationStats struct {
+	Iteration       int
+	ExplorationRate int
+	AverageReward   float64
+	Episodes        int
 }
 
 // BasicState is a generic implementation of State backed by a string context map.
@@ -150,14 +182,15 @@ func (p *BasicPolicy) AddState(state State, preferred Action, others []Action) {
 	p.OtherActions[id] = others
 }
 
-// BasicOutcome is a generic implementation of Outcome.
+// BasicOutcome is a generic implementation of Outcome that stores a discounted reward.
 type BasicOutcome struct {
 	Initial     State
 	ActionTaken Action
 	Final       State
+	RewardVal   float64
 }
 
-func (o *BasicOutcome) Reward() float64     { return o.Final.Reward() }
+func (o *BasicOutcome) Reward() float64     { return o.RewardVal }
 func (o *BasicOutcome) InitialState() State { return o.Initial }
 func (o *BasicOutcome) FinalState() State   { return o.Final }
 func (o *BasicOutcome) Action() Action      { return o.ActionTaken }
@@ -167,48 +200,81 @@ func outcomeKey(initial State, action Action) string {
 	return "[" + initial.ID() + " => " + action.ID() + "]"
 }
 
-// RunExperiment drives an experiment to completion using the given policy,
-// collecting outcomes for each state transition.
-func RunExperiment(experiment Experiment, policy Policy) []Outcome {
-	var pending []*BasicOutcome
+// effectiveDiscount returns 1.0 if gamma is 0 (unset), otherwise gamma.
+func effectiveDiscount(gamma float64) float64 {
+	if gamma == 0 {
+		return 1.0
+	}
+	return gamma
+}
+
+// RunExperiment drives an experiment to completion using the given policy.
+// The discount factor (gamma) controls how rewards diminish with distance from
+// the terminal state. Use 1.0 for no discounting.
+func RunExperiment(experiment Experiment, policy Policy, discount float64) []Outcome {
+	gamma := effectiveDiscount(discount)
+
+	type step struct {
+		state  State
+		action Action
+	}
+	var steps []step
+
 	state := experiment.ObserveState()
 	for !state.IsTerminal() {
 		action := policy.Action(state)
 		action.Run(experiment.Context())
-		outcome := &BasicOutcome{Initial: state, ActionTaken: action}
-		pending = append(pending, outcome)
+		steps = append(steps, step{state, action})
 		state = experiment.ObserveState()
 	}
 
-	outcomes := make([]Outcome, len(pending))
-	for i, o := range pending {
-		o.Final = state
-		outcomes[i] = o
+	terminalReward := state.Reward()
+	outcomes := make([]Outcome, len(steps))
+	for i, s := range steps {
+		stepsFromEnd := len(steps) - 1 - i
+		outcomes[i] = &BasicOutcome{
+			Initial:     s.state,
+			ActionTaken: s.action,
+			Final:       state,
+			RewardVal:   terminalReward * math.Pow(gamma, float64(stepsFromEnd)),
+		}
 	}
 	return outcomes
 }
 
 // ForceRunExperiment runs an experiment, forcing a specific first action
 // then following the policy for subsequent steps.
-func ForceRunExperiment(experiment Experiment, firstAction Action, policy Policy) []Outcome {
-	var pending []*BasicOutcome
-	state := experiment.ObserveState()
+func ForceRunExperiment(experiment Experiment, firstAction Action, policy Policy, discount float64) []Outcome {
+	gamma := effectiveDiscount(discount)
 
+	type step struct {
+		state  State
+		action Action
+	}
+	var steps []step
+
+	state := experiment.ObserveState()
 	firstAction.Run(experiment.Context())
-	pending = append(pending, &BasicOutcome{Initial: state, ActionTaken: firstAction})
+	steps = append(steps, step{state, firstAction})
 	state = experiment.ObserveState()
 
 	for !state.IsTerminal() {
 		action := policy.Action(state)
 		action.Run(experiment.Context())
-		pending = append(pending, &BasicOutcome{Initial: state, ActionTaken: action})
+		steps = append(steps, step{state, action})
 		state = experiment.ObserveState()
 	}
 
-	outcomes := make([]Outcome, len(pending))
-	for i, o := range pending {
-		o.Final = state
-		outcomes[i] = o
+	terminalReward := state.Reward()
+	outcomes := make([]Outcome, len(steps))
+	for i, s := range steps {
+		stepsFromEnd := len(steps) - 1 - i
+		outcomes[i] = &BasicOutcome{
+			Initial:     s.state,
+			ActionTaken: s.action,
+			Final:       state,
+			RewardVal:   terminalReward * math.Pow(gamma, float64(stepsFromEnd)),
+		}
 	}
 	return outcomes
 }
@@ -221,6 +287,8 @@ func CreateRandomPolicy(env Environment) *BasicPolicy {
 }
 
 // GetAverageRewards computes the average reward for each state-action pair in a set of outcomes.
+// If firstVisitOnly is true, callers should pre-filter episodes to include only the first
+// occurrence of each state-action pair per episode (see filterFirstVisit).
 func GetAverageRewards(outcomes []Outcome) map[string]float64 {
 	counts := make(map[string]int)
 	totals := make(map[string]float64)
@@ -235,6 +303,21 @@ func GetAverageRewards(outcomes []Outcome) map[string]float64 {
 		averages[key] = totals[key] / float64(counts[key])
 	}
 	return averages
+}
+
+// filterFirstVisit returns a copy of the episode with only the first occurrence
+// of each state-action pair preserved.
+func filterFirstVisit(episode []Outcome) []Outcome {
+	seen := make(map[string]bool)
+	var filtered []Outcome
+	for _, o := range episode {
+		key := outcomeKey(o.InitialState(), o.Action())
+		if !seen[key] {
+			seen[key] = true
+			filtered = append(filtered, o)
+		}
+	}
+	return filtered
 }
 
 // GetOptimalAction finds the action with the highest average reward for a given state.
@@ -289,23 +372,43 @@ func CreateImprovedPolicy(env Environment, outcomes []Outcome) *BasicPolicy {
 }
 
 // CreateOptimizedPolicy iterates over rounds of experimentation and improvement,
-// decreasing the randomization rate each round to converge on an optimal policy.
-func CreateOptimizedPolicy(env Environment, initialRandomizationRate int, experimentsPerIteration int, iterations int) *BasicPolicy {
+// decreasing the exploration rate each round to converge on an optimal policy.
+// Returns the optimized policy and per-iteration training statistics.
+func CreateOptimizedPolicy(env Environment, config TrainingConfig) (*BasicPolicy, []IterationStats) {
 	policy := CreateRandomPolicy(env)
+	gamma := effectiveDiscount(config.DiscountFactor)
+	stats := make([]IterationStats, 0, config.Iterations)
 
-	for i := iterations - 1; i >= 0; i-- {
-		randomizationRate := int(float64(initialRandomizationRate) * (float64(i) / float64(iterations-1)))
-		policy.RandomizationRate = randomizationRate
+	for i := config.Iterations - 1; i >= 0; i-- {
+		explorationRate := int(float64(config.InitialExplorationRate) * (float64(i) / float64(config.Iterations-1)))
+		policy.RandomizationRate = explorationRate
 
 		var outcomes []Outcome
-		for j := 0; j < experimentsPerIteration; j++ {
+		totalReward := 0.0
+		for j := 0; j < config.ExperimentsPerIteration; j++ {
 			experiment := env.CreateExperiment()
-			outcomes = append(outcomes, RunExperiment(experiment, policy)...)
+			episode := RunExperiment(experiment, policy, gamma)
+
+			if len(episode) > 0 {
+				totalReward += episode[len(episode)-1].Reward()
+			}
+
+			if config.FirstVisitOnly {
+				episode = filterFirstVisit(episode)
+			}
+			outcomes = append(outcomes, episode...)
 		}
+
+		stats = append(stats, IterationStats{
+			Iteration:       config.Iterations - i,
+			ExplorationRate: explorationRate,
+			AverageReward:   totalReward / float64(config.ExperimentsPerIteration),
+			Episodes:        config.ExperimentsPerIteration,
+		})
 
 		policy = CreateImprovedPolicy(env, outcomes)
 	}
 
 	policy.RandomizationRate = 0
-	return policy
+	return policy, stats
 }

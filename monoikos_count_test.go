@@ -74,8 +74,8 @@ func TestActionResults(t *testing.T) {
 			state: map[string]any{countContextKey: 1, doneContextKey: false},
 		}
 
-		io := monoikos.ForceRunExperiment(ie, ia, policy)[0]
-		so := monoikos.ForceRunExperiment(se, sa, policy)[0]
+		io := monoikos.ForceRunExperiment(ie, ia, policy, 1.0)[0]
+		so := monoikos.ForceRunExperiment(se, sa, policy, 1.0)[0]
 
 		iTotal += int(io.Reward())
 		sTotal += int(so.Reward())
@@ -111,8 +111,8 @@ func TestCreatePolicyFromOutcomes(t *testing.T) {
 	setReward(s3)
 
 	outcomes := []monoikos.Outcome{
-		&monoikos.BasicOutcome{Initial: s1, ActionTaken: ia, Final: s2},
-		&monoikos.BasicOutcome{Initial: s1, ActionTaken: sa, Final: s3},
+		&monoikos.BasicOutcome{Initial: s1, ActionTaken: ia, Final: s2, RewardVal: s2.Reward()},
+		&monoikos.BasicOutcome{Initial: s1, ActionTaken: sa, Final: s3, RewardVal: s3.Reward()},
 	}
 
 	for range 100 {
@@ -126,8 +126,20 @@ func TestCreatePolicyFromOutcomes(t *testing.T) {
 
 func TestCreateOptimizedCountPolicy(t *testing.T) {
 	env := &CountEnvironment{}
-	policy := monoikos.CreateOptimizedPolicy(env, 40, 100000, 5)
+	policy, stats := monoikos.CreateOptimizedPolicy(env, monoikos.TrainingConfig{
+		InitialExplorationRate:  40,
+		ExperimentsPerIteration: 100000,
+		Iterations:              5,
+		DiscountFactor:          0.99,
+		FirstVisitOnly:          true,
+	})
 
+	// Verify training stats were captured.
+	if len(stats) != 5 {
+		t.Errorf("Expected 5 iteration stats, got %d.", len(stats))
+	}
+
+	// The policy should learn to increment for all counts below the max.
 	for i := 1; i < maxCount-1; i++ {
 		state := monoikos.NewBasicState()
 		state.Context()[countContextKey] = strconv.Itoa(i)
@@ -139,17 +151,15 @@ func TestCreateOptimizedCountPolicy(t *testing.T) {
 		}
 	}
 
-	/*
-		// 19 and 20 fail right now, need to debug.
-		state := monoikos.NewBasicState()
-		state.Context()[countContextKey] = strconv.Itoa(maxCount)
-		state.Context()[doneContextKey] = strconv.FormatBool(false)
+	// With discounting, the policy should learn to stop at the max.
+	state := monoikos.NewBasicState()
+	state.Context()[countContextKey] = strconv.Itoa(maxCount)
+	state.Context()[doneContextKey] = strconv.FormatBool(false)
 
-		action := policy.PreferredAction(state)
-		if action.ID() != "Stop" {
-			t.Errorf("Expected optimized policy to Stop on '%v', got '%v'.", maxCount, action.ID())
-		}
-	*/
+	action := policy.PreferredAction(state)
+	if action.ID() != "Stop" {
+		t.Errorf("Expected optimized policy to Stop on '%v', got '%v'.", maxCount, action.ID())
+	}
 }
 
 // CountEnvironment is a domain where the agent learns to count as high as possible
@@ -187,7 +197,7 @@ type CountExperiment struct {
 func NewCountExperiment() *CountExperiment {
 	return &CountExperiment{
 		state: map[string]any{
-			countContextKey: rand.IntN(maxCount),
+			countContextKey: rand.IntN(maxCount + 1),
 			doneContextKey:  false,
 		},
 	}

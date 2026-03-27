@@ -48,7 +48,16 @@ func TestGetTwoLegalActions(t *testing.T) {
 
 func TestOptimizeBlackjackPolicy(t *testing.T) {
 	env := &BlackjackEnvironment{}
-	policy := monoikos.CreateOptimizedPolicy(env, 40, 100000, 5)
+	policy, stats := monoikos.CreateOptimizedPolicy(env, monoikos.TrainingConfig{
+		InitialExplorationRate:  40,
+		ExperimentsPerIteration: 100000,
+		Iterations:              5,
+		DiscountFactor:          1.0,
+	})
+
+	if len(stats) != 5 {
+		t.Errorf("Expected 5 iteration stats, got %d.", len(stats))
+	}
 
 	state := monoikos.NewBasicState()
 	state.Context()[playerContextKey] = "5"
