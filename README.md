@@ -72,13 +72,26 @@ for _, s := range stats {
 }
 ```
 
+## Included Packages
+
+### blackjack
+
+The `blackjack` subpackage (`github.com/tysont/monoikos/blackjack`) is a standalone blackjack game engine implementing standard rules: hit, stand, double down, soft 17 dealer behavior, and natural blackjack payouts. It can be used independently or as an RL environment.
+
+```go
+g := blackjack.NewGame()
+g.Hit()
+g.Stand()
+fmt.Println(g.Payout)
+```
+
 ## Examples
 
 The test suite includes two complete environment implementations:
 
 - **Counting game** (`monoikos_count_test.go`) — The agent learns to count as high as possible without exceeding a maximum. Demonstrates basic environment setup and how the discount factor helps the agent learn boundary behavior.
 
-- **Blackjack** (`monoikos_blackjack_test.go`) — The agent learns when to hit, stand, or double down. A more realistic domain showing how Monoikos handles larger state spaces with multiple actions.
+- **Blackjack** (`monoikos_blackjack_test.go`) — The agent learns when to hit, stand, or double down using the built-in blackjack engine. A more realistic domain showing how Monoikos handles larger state spaces with multiple actions.
 
 ## Running Tests
 

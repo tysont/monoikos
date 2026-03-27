@@ -6,12 +6,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tysont/blackjack"
 	"github.com/tysont/monoikos"
+	"github.com/tysont/monoikos/blackjack"
 )
 
 const (
-	idContextKey     = "id"
 	playerContextKey = "player"
 	pairContextKey   = "pair"
 	softContextKey   = "soft"
@@ -100,13 +99,7 @@ func TestOptimizeBlackjackPolicy(t *testing.T) {
 type BlackjackEnvironment struct{}
 
 func (e *BlackjackEnvironment) CreateExperiment() monoikos.Experiment {
-	x := &BlackjackExperiment{
-		state: make(map[string]any),
-	}
-	id := blackjack.GetNextId()
-	x.state[idContextKey] = id
-	blackjack.Deal(id)
-	return x
+	return &BlackjackExperiment{game: blackjack.NewGame()}
 }
 
 func (e *BlackjackEnvironment) LegalActions(state monoikos.State) []monoikos.Action {
@@ -145,55 +138,52 @@ func (e *BlackjackEnvironment) KnownStates() []monoikos.State {
 	return states
 }
 
-// BlackjackExperiment is a single hand of blackjack.
+// BlackjackExperiment wraps a blackjack.Game as a monoikos Experiment.
 type BlackjackExperiment struct {
-	state map[string]any
+	game *blackjack.Game
 }
 
 func (x *BlackjackExperiment) ObserveState() monoikos.State {
-	game := blackjack.Peek(x.state[idContextKey].(uint64))
+	g := x.game
 
 	s := monoikos.NewBasicState()
-	player, soft := blackjack.Evaluate(game.Player)
+	player, soft := blackjack.Evaluate(g.Player)
 	s.Context()[playerContextKey] = strconv.Itoa(player)
 	s.Context()[softContextKey] = strconv.FormatBool(soft)
-	s.Context()[pairContextKey] = strconv.FormatBool(len(game.Player) == 2)
+	s.Context()[pairContextKey] = strconv.FormatBool(len(g.Player) == 2)
 
-	dealer, _ := blackjack.Evaluate(game.Dealer)
+	dealer, _ := blackjack.Evaluate(g.Dealer)
 	s.Context()[dealerContextKey] = strconv.Itoa(dealer)
 
-	s.Terminal = game.Complete
-	s.RewardVal = float64(game.Payout)
+	s.Terminal = g.Complete
+	s.RewardVal = float64(g.Payout)
 	return s
 }
 
 func (x *BlackjackExperiment) Context() map[string]any {
-	return x.state
+	return map[string]any{"game": x.game}
 }
 
 // HitAction draws another card.
 type HitAction struct{}
 
 func (a *HitAction) Run(ctx map[string]any) {
-	blackjack.Hit(ctx[idContextKey].(uint64))
+	ctx["game"].(*blackjack.Game).Hit()
 }
-
 func (a *HitAction) ID() string { return "Hit" }
 
 // DoubleAction doubles down (draw one card, double the bet).
 type DoubleAction struct{}
 
 func (a *DoubleAction) Run(ctx map[string]any) {
-	blackjack.Double(ctx[idContextKey].(uint64))
+	ctx["game"].(*blackjack.Game).Double()
 }
-
 func (a *DoubleAction) ID() string { return "Double" }
 
 // StandAction keeps the current hand.
 type StandAction struct{}
 
 func (a *StandAction) Run(ctx map[string]any) {
-	blackjack.Stand(ctx[idContextKey].(uint64))
+	ctx["game"].(*blackjack.Game).Stand()
 }
-
 func (a *StandAction) ID() string { return "Stand" }
